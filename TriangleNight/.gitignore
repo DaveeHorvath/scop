@@ -1,3 +1,4 @@
 triangle
 *.o
 .vscode/*
+*.spv
