@@ -29,6 +29,7 @@ class App {
         #endif
 
         VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+        VkDevice device = VK_NULL_HANDLE;
 
         void run()
         {
@@ -70,6 +71,29 @@ class App {
             deviceQueueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
             deviceQueueCreateInfo.queueCount = 1;
             deviceQueueCreateInfo.queueFamilyIndex = queues.graphicsFamily.value();
+            float queuePrio = 1.0f;
+            deviceQueueCreateInfo.pQueuePriorities = &queuePrio;
+
+            VkPhysicalDeviceFeatures deviceFeatures{}; 
+
+
+            VkDeviceCreateInfo deviceCreateInfo{};
+            deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+            deviceCreateInfo.pQueueCreateInfos = &deviceQueueCreateInfo;
+            deviceCreateInfo.queueCreateInfoCount = 1;
+            deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
+            deviceCreateInfo.enabledExtensionCount = 0;
+
+            if (enableValidationLayers) {
+                deviceCreateInfo.enabledLayerCount = static_cast<uint32_t>(validationLayer.size());
+                deviceCreateInfo.ppEnabledLayerNames = validationLayer.data();
+            } else {
+                deviceCreateInfo.enabledLayerCount = 0;
+            }
+
+            if (vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &device ) != VK_SUCCESS)
+                throw std::runtime_error("Failed to create logical device");
+
         }
 
         QueueFamilyIndicies findQueueFamilyIndicies(VkPhysicalDevice dev)
@@ -160,7 +184,7 @@ class App {
                 for (auto& ext : extensions)
                     std::cout << "\t" << ext.extensionName << "\n";
             }
-            /* other */
+            /* device selection and creation */
             pickPhysicalDevice();
             makeLogicalDevice();
         }
@@ -173,6 +197,9 @@ class App {
         void clean()
         {
             std::cout << "=====  CLEANUP  =====\n";
+
+            vkDestroyDevice(device, nullptr);
+
             vkDestroyInstance(instance, nullptr);
             glfwDestroyWindow(win);
             glfwTerminate();
