@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <cstdlib>
 #include <vector>
+#include <set>
 #include <optional>
 
 #include <string.h>
@@ -16,6 +17,7 @@ class App {
     struct QueueFamilyIndicies
     {
         std::optional<uint32_t> graphicsFamily;
+        std::optional<uint32_t> presentFamily;
     };
     
     public:
@@ -30,6 +32,10 @@ class App {
 
         VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
         VkDevice device = VK_NULL_HANDLE;
+        VkQueue graphicsQueue;
+        VkQueue presentQueue;
+
+        VkSurfaceKHR surface;
 
         void run()
         {
@@ -64,23 +70,37 @@ class App {
             
         }
 
+        void createSurface()
+        {
+            if (glfwCreateWindowSurface(instance, win, nullptr, &surface) != VK_SUCCESS)
+                throw std::runtime_error("Failed to create surface");
+        }
+
         void makeLogicalDevice()
         {
             QueueFamilyIndicies queues = findQueueFamilyIndicies(physicalDevice);
-            VkDeviceQueueCreateInfo deviceQueueCreateInfo{};
-            deviceQueueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-            deviceQueueCreateInfo.queueCount = 1;
-            deviceQueueCreateInfo.queueFamilyIndex = queues.graphicsFamily.value();
+            std::set<uint32_t> uniquequeues{queues.graphicsFamily.value(), queues.presentFamily.value()}; 
+
+            
             float queuePrio = 1.0f;
-            deviceQueueCreateInfo.pQueuePriorities = &queuePrio;
+            std::vector<VkDeviceQueueCreateInfo> deviceQueueCreateInfos{};
+            for (auto& queue : uniquequeues)
+            {
+                VkDeviceQueueCreateInfo deviceQueueCreateInfo{};
+                deviceQueueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+                deviceQueueCreateInfo.queueCount = 1;
+                deviceQueueCreateInfo.queueFamilyIndex = queue;
+                deviceQueueCreateInfo.pQueuePriorities = &queuePrio;
+                deviceQueueCreateInfos.push_back(deviceQueueCreateInfo);
+            }
+
 
             VkPhysicalDeviceFeatures deviceFeatures{}; 
 
-
             VkDeviceCreateInfo deviceCreateInfo{};
             deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-            deviceCreateInfo.pQueueCreateInfos = &deviceQueueCreateInfo;
-            deviceCreateInfo.queueCreateInfoCount = 1;
+            deviceCreateInfo.pQueueCreateInfos = deviceQueueCreateInfos.data();
+            deviceCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(deviceQueueCreateInfos.size());
             deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
             deviceCreateInfo.enabledExtensionCount = 0;
 
@@ -93,7 +113,9 @@ class App {
 
             if (vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &device ) != VK_SUCCESS)
                 throw std::runtime_error("Failed to create logical device");
-
+            
+            vkGetDeviceQueue(device, queues.graphicsFamily.value(), 0, &graphicsQueue);
+            vkGetDeviceQueue(device, queues.presentFamily.value(), 0, &presentQueue);
         }
 
         QueueFamilyIndicies findQueueFamilyIndicies(VkPhysicalDevice dev)
@@ -109,6 +131,10 @@ class App {
             {
                 if (fam.queueFlags & VK_QUEUE_GRAPHICS_BIT)
                     indicies.graphicsFamily = index;
+                VkBool32 isPresentQueue = VK_FALSE;
+                vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, index, surface, &isPresentQueue);
+                if (isPresentQueue)
+                    indicies.presentFamily = index;
                 index++;
             }
             return indicies;
@@ -184,9 +210,15 @@ class App {
                 for (auto& ext : extensions)
                     std::cout << "\t" << ext.extensionName << "\n";
             }
+
+            /* Surface and pipeline */
+            createSurface();
+
             /* device selection and creation */
             pickPhysicalDevice();
             makeLogicalDevice();
+
+
         }
         void loop()
         {
@@ -199,7 +231,7 @@ class App {
             std::cout << "=====  CLEANUP  =====\n";
 
             vkDestroyDevice(device, nullptr);
-
+            vkDestroySurfaceKHR(instance, surface, nullptr);
             vkDestroyInstance(instance, nullptr);
             glfwDestroyWindow(win);
             glfwTerminate();
