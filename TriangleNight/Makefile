@@ -5,12 +5,16 @@ LDFLAGS = -lglfw -lvulkan -ldl -lpthread -lX11 -lXxf86vm -lXrandr -lXi
 
 SRC=main.cpp
 OBJ=$(SRC:.cpp=.o)
+SHADERS=shader.frag shader.vert
+SPV=frag.spv vert.spv
 
 test: $(NAME)
 	./triangle
 
+%.spv: shader.%
+	glslc $< -o $@
 
-$(NAME): $(OBJ)
+$(NAME): $(OBJ) $(SPV)
 	$(CXX) $(CXXFLAGS) -o $(NAME) $(OBJ) $(LDFLAGS)
 
 %.o: %.cpp

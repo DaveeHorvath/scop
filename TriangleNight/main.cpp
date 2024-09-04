@@ -7,11 +7,27 @@
 #include <vector>
 #include <set>
 #include <optional>
+#include <fstream>
 
 #include <string.h>
 
 #define WIDTH 500
 #define HEIGHT 500
+
+static std::vector<char> readShader(const std::string& filename) 
+{
+    std::ifstream file(filename, std::ios::ate | std::ios::binary);
+
+    if (!file.is_open()) {
+        throw std::runtime_error("failed to open file!");
+    }
+    size_t fileSize = (size_t) file.tellg();
+    std::vector<char> buffer(fileSize);
+    file.seekg(0);
+    file.read(buffer.data(), fileSize);
+    file.close();
+    return buffer;
+}
 
 class App {
     struct QueueFamilyIndicies
@@ -85,10 +101,49 @@ class App {
             
         }
 
+        VkShaderModule makeShaderModule(const std::vector<char>& shader)
+        {
+            VkShaderModuleCreateInfo shaderModuleCreateInfo{};
+            shaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+            shaderModuleCreateInfo.codeSize = shader.size();
+            shaderModuleCreateInfo.pCode = reinterpret_cast<const uint32_t*>(shader.data());
+
+            VkShaderModule shaderModule;
+            if (vkCreateShaderModule(device, &shaderModuleCreateInfo, nullptr, &shaderModule) != VK_SUCCESS)
+                throw std::runtime_error("Failed to create shadermodule");
+            return shaderModule;
+        }
+
         void createSurface()
         {
             if (glfwCreateWindowSurface(instance, win, nullptr, &surface) != VK_SUCCESS)
                 throw std::runtime_error("Failed to create surface");
+        }
+
+        void makePipeline()
+        {
+            std::vector<char> vertexShader = readShader("vert.spv");
+            std::vector<char> fragmentShader = readShader("frag.spv");
+
+            VkShaderModule vertexShaderModule = makeShaderModule(vertexShader);
+            VkShaderModule fragmentShaderModule = makeShaderModule(fragmentShader);
+
+            VkPipelineShaderStageCreateInfo vertexShaderStageCreateInfo{};
+            vertexShaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+            vertexShaderStageCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+            vertexShaderStageCreateInfo.module = vertexShaderModule;
+            vertexShaderStageCreateInfo.pName = "main";
+
+            VkPipelineShaderStageCreateInfo fragmentShaderStageCreateInfo{};
+            vertexShaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+            vertexShaderStageCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+            vertexShaderStageCreateInfo.module = fragmentShaderModule;
+            vertexShaderStageCreateInfo.pName = "main";
+
+            VkPipelineShaderStageCreateInfo pipelineShaderStageCreateInfo[] = {vertexShaderStageCreateInfo, fragmentShaderStageCreateInfo};
+
+            vkDestroyShaderModule(device, vertexShaderModule, nullptr);
+            vkDestroyShaderModule(device, fragmentShaderModule, nullptr);
         }
 
         void makeSwapChain()
@@ -357,7 +412,7 @@ class App {
                     std::cout << "\t" << ext.extensionName << "\n";
             }
 
-            /* Surface and pipeline */
+            /* Surface*/
             createSurface();
 
             /* device selection and creation */
@@ -367,7 +422,8 @@ class App {
             /* SwapChain */
             makeSwapChain();
 
-
+            /* pipeline */
+            makePipeline();
         }
         void loop()
         {
@@ -403,3 +459,5 @@ int main()
         exit(69);
     }
 }
+
+
