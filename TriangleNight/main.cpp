@@ -72,7 +72,7 @@ class App {
         VkPipelineLayout pipelineLayout;
 
         VkPipeline graphicsPipeline;
-
+        std::vector<VkFramebuffer> swapchainFramebuffers;
 
         void run()
         {
@@ -124,6 +124,28 @@ class App {
         {
             if (glfwCreateWindowSurface(instance, win, nullptr, &surface) != VK_SUCCESS)
                 throw std::runtime_error("Failed to create surface");
+        }
+
+        void makeFrameBuffer()
+        {
+            swapchainFramebuffers.resize(swapchainImagesViews.size());
+
+            for (int i = 0; i < swapchainImagesViews.size(); i++)
+            {
+                VkImageView imageViews[] = {swapchainImagesViews[i]};
+
+                VkFramebufferCreateInfo framebufferCreateInfo{};
+                framebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+                framebufferCreateInfo.renderPass = renderPass;
+                framebufferCreateInfo.attachmentCount = 1;
+                framebufferCreateInfo.pAttachments = imageViews;
+                framebufferCreateInfo.height = swapchainExtent.height;
+                framebufferCreateInfo.width = swapchainExtent.width;
+                framebufferCreateInfo.layers = 1;
+
+                if (vkCreateFramebuffer(device, &framebufferCreateInfo, nullptr, &swapchainFramebuffers[i]) != VK_SUCCESS)
+                    throw std::runtime_error("Failed to create framebuffers");
+            }
         }
 
         void makeRenderPass()
@@ -556,6 +578,9 @@ class App {
             /* pipeline */
             makeRenderPass();
             makePipeline();
+
+            /* Framebuffer */
+            makeFrameBuffer();
         }
         void loop()
         {
@@ -566,6 +591,8 @@ class App {
         void clean()
         {
             std::cout << "=====  CLEANUP  =====\n";
+            for (auto& buffer : swapchainFramebuffers)
+                vkDestroyFramebuffer(device, buffer, nullptr);
             vkDestroyPipeline(device, graphicsPipeline, nullptr);
             vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
             vkDestroyRenderPass(device, renderPass, nullptr);
