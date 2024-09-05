@@ -74,6 +74,14 @@ class App {
         VkPipeline graphicsPipeline;
         std::vector<VkFramebuffer> swapchainFramebuffers;
 
+        VkCommandPool commandPool;
+        VkCommandBuffer commandBuffer;
+
+        /* Sync objects */
+        VkSemaphore imageDoneSemaphore;
+        VkSemaphore renderFinishedSemaphore;
+        VkFence inFlightFence;
+
         void run()
         {
             init_window();
@@ -120,10 +128,124 @@ class App {
             return shaderModule;
         }
 
+        void drawFrame()
+        {
+            vkWaitForFences(device, 1, &inFlightFence, VK_TRUE, UINT64_MAX);
+            vkResetFences(device, 1, &inFlightFence);
+
+
+            uint32_t image;
+            vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, imageDoneSemaphore, VK_NULL_HANDLE, &image);
+            vkResetCommandBuffer(commandBuffer, 0);
+
+            recordCommandBuffer(commandBuffer, image);
+
+            VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+
+            VkSubmitInfo submitInfo{};
+            submitInfo.commandBufferCount = 1;
+            submitInfo.pCommandBuffers = &commandBuffer;
+            submitInfo.signalSemaphoreCount = 1;
+            submitInfo.pSignalSemaphores = &renderFinishedSemaphore;
+            submitInfo.waitSemaphoreCount = 1;
+            submitInfo.pWaitSemaphores = &imageDoneSemaphore;
+            submitInfo.pWaitDstStageMask = waitStages;
+
+            if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFence) != VK_SUCCESS)
+                throw std::runtime_error("Failed to submit to queue");
+
+        }
+
+        void recordCommandBuffer(VkCommandBuffer buffer, uint32_t image)
+        {
+            VkCommandBufferBeginInfo commandBufferBeginInfo{};
+            commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+            if (vkBeginCommandBuffer(buffer, &commandBufferBeginInfo) != VK_SUCCESS)
+                throw std::runtime_error("Failed to begin command buffer");
+
+            VkRenderPassBeginInfo renderPassBeginInfo{};
+            renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+            renderPassBeginInfo.renderPass = renderPass;
+            renderPassBeginInfo.framebuffer = swapchainFramebuffers[image];
+
+            renderPassBeginInfo.renderArea.offset = {0, 0};
+            renderPassBeginInfo.renderArea.extent = swapchainExtent;
+
+            VkClearValue clearColor = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
+            renderPassBeginInfo.clearValueCount = 1;
+            renderPassBeginInfo.pClearValues = &clearColor;
+
+            vkCmdBeginRenderPass(buffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+            vkCmdBindPipeline(buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+
+            VkViewport viewport{};
+            viewport.x = 0.0f;
+            viewport.y = 0.0f;
+            viewport.width = (float) swapchainExtent.width;
+            viewport.height = (float) swapchainExtent.height;
+            viewport.minDepth = 0.0f;
+            viewport.maxDepth = 1.0f;
+            vkCmdSetViewport(buffer, 0, 1, &viewport);
+
+            VkRect2D scissor{};
+            scissor.offset = {0, 0};
+            scissor.extent = swapchainExtent;
+            vkCmdSetScissor(buffer, 0, 1, &scissor);
+
+            vkCmdDraw(buffer, 3, 1, 0, 0);
+
+            vkCmdEndRenderPass(buffer);
+            if (vkEndCommandBuffer(buffer) != VK_SUCCESS)
+                throw std::runtime_error("Failed to end commandbuffer");
+        }
+
         void createSurface()
         {
             if (glfwCreateWindowSurface(instance, win, nullptr, &surface) != VK_SUCCESS)
                 throw std::runtime_error("Failed to create surface");
+        }
+
+        void makeSyncObjects()
+        {
+            VkSemaphoreCreateInfo semaphoreCreateInfo{};
+            semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    
+            if (vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &imageDoneSemaphore) != VK_SUCCESS)
+                throw std::runtime_error("Failed to create semaphore");
+            if (vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &renderFinishedSemaphore) != VK_SUCCESS)
+                throw std::runtime_error("Failed to create semaphore");
+
+            VkFenceCreateInfo fenceCreateInfo{};
+            fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+            fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+            if (vkCreateFence(device, &fenceCreateInfo, nullptr, &inFlightFence) != VK_SUCCESS)
+                throw std::runtime_error("Failed to create fence");
+
+        }
+
+        void makeCommandPool()
+        {
+            QueueFamilyIndicies indicies = findQueueFamilyIndicies(physicalDevice);
+            VkCommandPoolCreateInfo commandPoolCreateInfo{};
+            commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+            commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+            commandPoolCreateInfo.queueFamilyIndex = indicies.graphicsFamily.value();
+
+            if (vkCreateCommandPool(device, &commandPoolCreateInfo, nullptr, &commandPool) != VK_SUCCESS)
+                throw std::runtime_error("Failed to create command pool");
+        }
+
+        void makeCommandBuffer()
+        {
+            VkCommandBufferAllocateInfo commandBufferAllocateInfo{};
+            commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+            commandBufferAllocateInfo.commandBufferCount = 1;
+            commandBufferAllocateInfo.commandPool = commandPool;
+            commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+            if (vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, &commandBuffer) != VK_SUCCESS)
+                throw std::runtime_error("Failed to allocate command buffer");
         }
 
         void makeFrameBuffer()
@@ -175,6 +297,19 @@ class App {
             renderPassCreateInfo.pAttachments = &attachmentDescription;
             renderPassCreateInfo.subpassCount = 1;
             renderPassCreateInfo.pSubpasses = &subpassDescription;
+
+            VkSubpassDependency subpassDependency{};
+            subpassDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+            subpassDependency.dstSubpass = 0;
+
+            subpassDependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            subpassDependency.srcAccessMask = 0;
+
+            subpassDependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            subpassDependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+            renderPassCreateInfo.dependencyCount = 1;
+            renderPassCreateInfo.pDependencies = &subpassDependency;
 
             if (vkCreateRenderPass(device, &renderPassCreateInfo, nullptr, &renderPass) != VK_SUCCESS)
                 throw std::runtime_error("Failed to create renderpass");
@@ -581,16 +716,31 @@ class App {
 
             /* Framebuffer */
             makeFrameBuffer();
+
+            /* Pools */
+            makeCommandPool();
+            makeCommandBuffer();
+
+            /* Sync */
+            makeSyncObjects();
         }
         void loop()
         {
             std::cout << "=====  LOOP'O CLOCK  =====\n";
             while(!glfwWindowShouldClose(win))
+            {
                 glfwPollEvents();
+                drawFrame();
+            }
         }
         void clean()
         {
             std::cout << "=====  CLEANUP  =====\n";
+            vkDestroyFence(device, inFlightFence, nullptr);
+            vkDestroySemaphore(device, imageDoneSemaphore, nullptr);
+            vkDestroySemaphore(device, renderFinishedSemaphore, nullptr);
+
+            vkDestroyCommandPool(device, commandPool, nullptr);
             for (auto& buffer : swapchainFramebuffers)
                 vkDestroyFramebuffer(device, buffer, nullptr);
             vkDestroyPipeline(device, graphicsPipeline, nullptr);
