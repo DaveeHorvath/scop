@@ -173,10 +173,10 @@ class App {
             vertexShaderStageCreateInfo.pName = "main";
 
             VkPipelineShaderStageCreateInfo fragmentShaderStageCreateInfo{};
-            vertexShaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-            vertexShaderStageCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-            vertexShaderStageCreateInfo.module = fragmentShaderModule;
-            vertexShaderStageCreateInfo.pName = "main";
+            fragmentShaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+            fragmentShaderStageCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+            fragmentShaderStageCreateInfo.module = fragmentShaderModule;
+            fragmentShaderStageCreateInfo.pName = "main";
 
             VkPipelineShaderStageCreateInfo pipelineShaderStageCreateInfo[] = {vertexShaderStageCreateInfo, fragmentShaderStageCreateInfo};
 
@@ -206,7 +206,9 @@ class App {
 
             VkPipelineViewportStateCreateInfo pipelineViewpoerStateCreateInfo{};
             pipelineViewpoerStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+            pipelineViewpoerStateCreateInfo.scissorCount = 1;
             pipelineViewpoerStateCreateInfo.pScissors = &scissor;
+            pipelineViewpoerStateCreateInfo.viewportCount = 1;
             pipelineViewpoerStateCreateInfo.pViewports = &viewport;
 
             std::vector<VkDynamicState> dynamicStates = {

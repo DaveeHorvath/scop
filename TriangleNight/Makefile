@@ -1,6 +1,6 @@
 NAME=triangle
 CXX=c++
-CXXFLAGS= -std=c++17 -Ofast -DDEBUG
+CXXFLAGS= -std=c++17 -Ofast -DDEBUG -g
 LDFLAGS = -lglfw -lvulkan -ldl -lpthread -lX11 -lXxf86vm -lXrandr -lXi
 
 SRC=main.cpp
