@@ -11,8 +11,8 @@
 
 #include <string.h>
 
-#define WIDTH 500
-#define HEIGHT 500
+#define WIDTH 1000
+#define HEIGHT 1000
 
 static std::vector<char> readShader(const std::string& filename) 
 {
@@ -136,13 +136,14 @@ class App {
 
             uint32_t image;
             vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, imageDoneSemaphore, VK_NULL_HANDLE, &image);
-            vkResetCommandBuffer(commandBuffer, 0);
 
+            vkResetCommandBuffer(commandBuffer, 0);
             recordCommandBuffer(commandBuffer, image);
 
             VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
 
             VkSubmitInfo submitInfo{};
+            submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
             submitInfo.commandBufferCount = 1;
             submitInfo.pCommandBuffers = &commandBuffer;
             submitInfo.signalSemaphoreCount = 1;
@@ -154,6 +155,15 @@ class App {
             if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFence) != VK_SUCCESS)
                 throw std::runtime_error("Failed to submit to queue");
 
+            VkPresentInfoKHR presentInfo{};
+            presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+            presentInfo.swapchainCount = 1;
+            presentInfo.pSwapchains = &swapchain;
+            presentInfo.pImageIndices = &image;
+            presentInfo.waitSemaphoreCount = 1;
+            presentInfo.pWaitSemaphores = &renderFinishedSemaphore;
+
+            vkQueuePresentKHR(graphicsQueue, &presentInfo);
         }
 
         void recordCommandBuffer(VkCommandBuffer buffer, uint32_t image)
@@ -165,7 +175,7 @@ class App {
                 throw std::runtime_error("Failed to begin command buffer");
 
             VkRenderPassBeginInfo renderPassBeginInfo{};
-            renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+            renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
             renderPassBeginInfo.renderPass = renderPass;
             renderPassBeginInfo.framebuffer = swapchainFramebuffers[image];
 
@@ -288,15 +298,9 @@ class App {
 
             VkSubpassDescription subpassDescription{};
             subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+            subpassDescription.colorAttachmentCount = 1;
             subpassDescription.pColorAttachments = &attachmentReference;
 
-
-            VkRenderPassCreateInfo renderPassCreateInfo{};
-            renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-            renderPassCreateInfo.attachmentCount = 1;
-            renderPassCreateInfo.pAttachments = &attachmentDescription;
-            renderPassCreateInfo.subpassCount = 1;
-            renderPassCreateInfo.pSubpasses = &subpassDescription;
 
             VkSubpassDependency subpassDependency{};
             subpassDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -308,6 +312,12 @@ class App {
             subpassDependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
             subpassDependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
+            VkRenderPassCreateInfo renderPassCreateInfo{};
+            renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+            renderPassCreateInfo.attachmentCount = 1;
+            renderPassCreateInfo.pAttachments = &attachmentDescription;
+            renderPassCreateInfo.subpassCount = 1;
+            renderPassCreateInfo.pSubpasses = &subpassDescription;
             renderPassCreateInfo.dependencyCount = 1;
             renderPassCreateInfo.pDependencies = &subpassDependency;
 
@@ -436,13 +446,17 @@ class App {
 
         void makeSwapChain()
         {
+            
             SwapChainSupportDetails details = findSwapChainSupportDetails(physicalDevice);
+            uint32_t imageCount = details.capabilities.minImageCount + 1;
+            if (details.capabilities.maxImageCount > 0 && imageCount > details.capabilities.maxImageCount)
+                imageCount = details.capabilities.maxImageCount;
 
             VkSurfaceFormatKHR surfaceFormat = pickSurfaceFormat(details.formats);
             VkSwapchainCreateInfoKHR swapchainCreateInfo{};
             swapchainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
             swapchainCreateInfo.surface = surface;
-            swapchainCreateInfo.minImageCount = details.capabilities.maxImageCount > 0 ? std::min(details.capabilities.minImageCount + 1, details.capabilities.maxImageCount) : details.capabilities.minImageCount + 1;
+            swapchainCreateInfo.minImageCount = imageCount;
 
             swapchainImageFormat = surfaceFormat.format;
             swapchainCreateInfo.imageFormat = swapchainImageFormat;
@@ -479,11 +493,8 @@ class App {
 
             /* Make swapchain images */
             vkGetSwapchainImagesKHR(device, swapchain, &swapchainImageCount, nullptr);
-            if (swapchainImageCount)
-            {
-                swapchainImages.resize(swapchainImageCount);
-                vkGetSwapchainImagesKHR(device, swapchain, &swapchainImageCount, swapchainImages.data());
-            }
+            swapchainImages.resize(swapchainImageCount);
+            vkGetSwapchainImagesKHR(device, swapchain, &swapchainImageCount, swapchainImages.data());
             /* Make swapchain image views */
             swapchainImagesViews.resize(swapchainImages.size());
             for (int i = 0; i < swapchainImages.size(); i++)
@@ -495,7 +506,10 @@ class App {
                 imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
                 imageViewCreateInfo.format = swapchainImageFormat;
 
-                imageViewCreateInfo.components = {VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY};
+                imageViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+                imageViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+                imageViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+                imageViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
                 imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
                 imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
                 imageViewCreateInfo.subresourceRange.levelCount = 1;
@@ -732,6 +746,8 @@ class App {
                 glfwPollEvents();
                 drawFrame();
             }
+            std::cout << "=====  WAIT FOR CLEAN  =====\n";
+            vkDeviceWaitIdle(device);
         }
         void clean()
         {
