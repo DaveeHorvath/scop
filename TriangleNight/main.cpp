@@ -68,7 +68,11 @@ class App {
         std::vector<VkImage> swapchainImages;
         std::vector<VkImageView> swapchainImagesViews;
 
+        VkRenderPass renderPass;
         VkPipelineLayout pipelineLayout;
+
+        VkPipeline graphicsPipeline;
+
 
         void run()
         {
@@ -124,9 +128,34 @@ class App {
 
         void makeRenderPass()
         {
-            VkAttachmentDescription colorAttachment{};
-            colorAttachment.format = swapchainImageFormat;
-            colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+            VkAttachmentDescription attachmentDescription{};
+            attachmentDescription.format = swapchainImageFormat;
+            attachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
+            attachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+            attachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            attachmentDescription.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            attachmentDescription.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            attachmentDescription.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            attachmentDescription.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+            VkAttachmentReference attachmentReference{};
+            attachmentReference.attachment = 0;
+            attachmentReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+            VkSubpassDescription subpassDescription{};
+            subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+            subpassDescription.pColorAttachments = &attachmentReference;
+
+
+            VkRenderPassCreateInfo renderPassCreateInfo{};
+            renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+            renderPassCreateInfo.attachmentCount = 1;
+            renderPassCreateInfo.pAttachments = &attachmentDescription;
+            renderPassCreateInfo.subpassCount = 1;
+            renderPassCreateInfo.pSubpasses = &subpassDescription;
+
+            if (vkCreateRenderPass(device, &renderPassCreateInfo, nullptr, &renderPass) != VK_SUCCESS)
+                throw std::runtime_error("Failed to create renderpass");
         }
 
         void makePipeline()
@@ -180,6 +209,16 @@ class App {
             pipelineViewpoerStateCreateInfo.pScissors = &scissor;
             pipelineViewpoerStateCreateInfo.pViewports = &viewport;
 
+            std::vector<VkDynamicState> dynamicStates = {
+                VK_DYNAMIC_STATE_VIEWPORT,
+                VK_DYNAMIC_STATE_SCISSOR
+            };
+
+            VkPipelineDynamicStateCreateInfo pipelineDynamicStateCreateInfo{};
+            pipelineDynamicStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+            pipelineDynamicStateCreateInfo.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
+            pipelineDynamicStateCreateInfo.pDynamicStates = dynamicStates.data();
+
             /* rasterizer */
             VkPipelineRasterizationStateCreateInfo pipelineRasterizationCreateInfo{};
             pipelineRasterizationCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
@@ -212,6 +251,25 @@ class App {
             if (vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout) != VK_SUCCESS)
                 throw std::runtime_error("Failed to create pipeline layout");
 
+            VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo{};
+            graphicsPipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+            graphicsPipelineCreateInfo.stageCount = 2;
+            graphicsPipelineCreateInfo.pStages = pipelineShaderStageCreateInfo;
+            graphicsPipelineCreateInfo.pVertexInputState = &pipelineVertexInputStateCreateInfo;
+            graphicsPipelineCreateInfo.pInputAssemblyState = &pipelineInputAssemblyStateCreateInfo;
+            graphicsPipelineCreateInfo.pColorBlendState = &pipelineColorBlendStateCreateInfo;
+            graphicsPipelineCreateInfo.pRasterizationState = &pipelineRasterizationCreateInfo;
+            graphicsPipelineCreateInfo.layout = pipelineLayout;
+            graphicsPipelineCreateInfo.pViewportState = &pipelineViewpoerStateCreateInfo;
+            graphicsPipelineCreateInfo.pMultisampleState = &pipelineMultisampleStateCreateInfo;
+            graphicsPipelineCreateInfo.pDynamicState = &pipelineDynamicStateCreateInfo;
+            graphicsPipelineCreateInfo.renderPass = renderPass;
+            graphicsPipelineCreateInfo.subpass = 0;
+            graphicsPipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
+            graphicsPipelineCreateInfo.basePipelineIndex = -1;
+
+            if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &graphicsPipelineCreateInfo, nullptr, &graphicsPipeline) != VK_SUCCESS)
+                throw std::runtime_error("Failed to create pipeline");
 
             vkDestroyShaderModule(device, vertexShaderModule, nullptr);
             vkDestroyShaderModule(device, fragmentShaderModule, nullptr);
@@ -506,7 +564,9 @@ class App {
         void clean()
         {
             std::cout << "=====  CLEANUP  =====\n";
+            vkDestroyPipeline(device, graphicsPipeline, nullptr);
             vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+            vkDestroyRenderPass(device, renderPass, nullptr);
             for (auto& imageView : swapchainImagesViews)
                 vkDestroyImageView(device, imageView, nullptr);
             vkDestroySwapchainKHR(device, swapchain, nullptr);
