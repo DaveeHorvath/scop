@@ -1,10 +1,13 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+#include <glm/glm.hpp>
+
 #include <iostream>
 #include <stdexcept>
 #include <cstdlib>
 #include <vector>
+#include <array>
 #include <set>
 #include <optional>
 #include <fstream>
@@ -13,6 +16,8 @@
 
 #define WIDTH 1000
 #define HEIGHT 1000
+
+
 
 static std::vector<char> readShader(const std::string& filename) 
 {
@@ -30,6 +35,41 @@ static std::vector<char> readShader(const std::string& filename)
 }
 
 class App {
+
+    struct Vertex {
+        glm::vec2 pos;
+        glm::vec3 color;
+
+        static VkVertexInputBindingDescription getBindingDescription(){
+            VkVertexInputBindingDescription bindingDescription{};
+            bindingDescription.binding = 0;
+            bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+            bindingDescription.stride = sizeof(Vertex);
+            return bindingDescription;
+        };
+        static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions() 
+        {
+            std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions{};
+            attributeDescriptions[0].binding = 0;
+            attributeDescriptions[0].location = 0;
+            attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+            attributeDescriptions[0].offset = offsetof(Vertex, pos);
+
+            attributeDescriptions[1].binding = 0;
+            attributeDescriptions[1].location = 1;
+            attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+            attributeDescriptions[1].offset = offsetof(Vertex, color);
+
+            return attributeDescriptions;
+        };
+    };
+
+
+        const std::vector<Vertex> vertices = {
+            {{0.0f, -0.5f}, {1.0f, 1.0f, 1.0f}},
+            {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+            {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+        };
 
     const int MAX_FRAMES_IN_FLIGHT = 2;
     uint32_t currentFrame;
@@ -86,6 +126,9 @@ class App {
         std::vector<VkSemaphore> imageDoneSemaphores;
         std::vector<VkSemaphore> renderFinishedSemaphores;
         std::vector<VkFence> inFlightFences;
+
+        VkBuffer vertexBuffer;
+        VkDeviceMemory vertexBufferMemory;
 
         void run()
         {
@@ -228,7 +271,12 @@ class App {
             scissor.extent = swapchainExtent;
             vkCmdSetScissor(buffer, 0, 1, &scissor);
 
-            vkCmdDraw(buffer, 3, 1, 0, 0);
+            /* extra binding if im not mistaken */
+            VkBuffer vertexBuffers[] = {vertexBuffer};
+            VkDeviceSize offsets[] = {0};
+            vkCmdBindVertexBuffers(buffer, 0, 1, vertexBuffers, offsets);
+
+            vkCmdDraw(buffer, static_cast<uint32_t>(vertices.size()), 1, 0, 0);
 
             vkCmdEndRenderPass(buffer);
             if (vkEndCommandBuffer(buffer) != VK_SUCCESS)
@@ -264,6 +312,39 @@ class App {
             }
 
         }
+
+        void makeVertexBuffer()
+        {
+            VkBufferCreateInfo bufferCreateInfo{};
+
+            bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+            bufferCreateInfo.size = sizeof(vertices[0]) * vertices.size();
+            bufferCreateInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+            bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+            if (vkCreateBuffer(device, &bufferCreateInfo, nullptr, &vertexBuffer) != VK_SUCCESS)
+                throw std::runtime_error("Failed to create vertex buffer");
+
+            VkMemoryRequirements memRequirements;
+            vkGetBufferMemoryRequirements(device, vertexBuffer, &memRequirements);
+
+            VkMemoryAllocateInfo allocInfo{};
+            allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+            allocInfo.allocationSize = memRequirements.size;
+            allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+            
+            if (vkAllocateMemory(device, &allocInfo, nullptr, &vertexBufferMemory) != VK_SUCCESS)
+                throw std::runtime_error("Failed to allocate memory");
+
+            vkBindBufferMemory(device, vertexBuffer, vertexBufferMemory, 0);
+
+            void* data;
+            vkMapMemory(device, vertexBufferMemory, 0, bufferCreateInfo.size, 0, &data);
+                memcpy(data, vertices.data(), (size_t)bufferCreateInfo.size);
+            vkUnmapMemory(device, vertexBufferMemory);
+        }
+
 
         void makeCommandPool()
         {
@@ -380,10 +461,17 @@ class App {
 
             /* HALF ASLEEP PLEASE REVIEW TMRW FOR REASONS, MOSTLY OUT OF TEXTBOOK */
             /* Viewport setup with scisor and the viewport itself */
+
+            auto bindingDescription = Vertex::getBindingDescription();
+            auto attributeDescription = Vertex::getAttributeDescriptions();
+
             VkPipelineVertexInputStateCreateInfo pipelineVertexInputStateCreateInfo{};
             pipelineVertexInputStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-            pipelineVertexInputStateCreateInfo.vertexBindingDescriptionCount = 0;
-            pipelineVertexInputStateCreateInfo.vertexAttributeDescriptionCount = 0;
+            pipelineVertexInputStateCreateInfo.vertexBindingDescriptionCount = 1;
+            pipelineVertexInputStateCreateInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescription.size());
+            pipelineVertexInputStateCreateInfo.pVertexBindingDescriptions = &bindingDescription;
+            pipelineVertexInputStateCreateInfo.pVertexAttributeDescriptions = attributeDescription.data();
+
 
             VkPipelineInputAssemblyStateCreateInfo pipelineInputAssemblyStateCreateInfo{};
             pipelineInputAssemblyStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -494,8 +582,7 @@ class App {
         }
 
         void makeSwapChain()
-        {
-            
+        {   
             SwapChainSupportDetails details = findSwapChainSupportDetails(physicalDevice);
             uint32_t imageCount = details.capabilities.minImageCount + 1;
             if (details.capabilities.maxImageCount > 0 && imageCount > details.capabilities.maxImageCount)
@@ -613,6 +700,19 @@ class App {
             
             vkGetDeviceQueue(device, queues.graphicsFamily.value(), 0, &graphicsQueue);
             vkGetDeviceQueue(device, queues.presentFamily.value(), 0, &presentQueue);
+        }
+
+        uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags props)
+        {
+            VkPhysicalDeviceMemoryProperties memProps;
+            vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProps);
+
+            for (uint32_t i = 0; i < memProps.memoryTypeCount; i++)
+            {
+                if (typeFilter & (i << 1) && (memProps.memoryTypes[i].propertyFlags & props) == props)
+                    return i;
+            }
+            throw std::runtime_error("Failed to find suitable memory type");
         }
 
         QueueFamilyIndicies findQueueFamilyIndicies(VkPhysicalDevice dev)
@@ -789,12 +889,17 @@ class App {
             /* Framebuffer */
             makeFrameBuffer();
 
+            /* Vertex Buffer */
+            makeVertexBuffer();
+
             /* Pools */
             makeCommandPool();
             makeCommandBuffer();
 
+
             /* Sync */
             makeSyncObjects();
+
         }
         void loop()
         {
@@ -810,6 +915,10 @@ class App {
         void clean()
         {
             std::cout << "=====  CLEANUP  =====\n";
+
+            vkDestroyBuffer(device, vertexBuffer, nullptr);
+            vkFreeMemory(device, vertexBufferMemory, nullptr);
+
             for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
             {
                 vkDestroyFence(device, inFlightFences[i], nullptr);
