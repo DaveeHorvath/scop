@@ -1,6 +1,9 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tiny_obj_loader.h>
+
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
@@ -24,8 +27,6 @@
 
 #define WIDTH 1000
 #define HEIGHT 1000
-
-
 
 static std::vector<char> readShader(const std::string& filename) 
 {
@@ -86,21 +87,23 @@ class App {
     };
 
 
-        const std::vector<Vertex> vertices = {
-            {{-0.5f, -0.5f, 0.0f},    {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-            {{0.5f, -0.5f, 0.0f},     {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-            {{0.5f, 0.5f, 0.0f},      {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
-            {{-0.5f, 0.5f, 0.0f},     {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},
+        // const std::vector<Vertex> vertices = {
+        //     {{-0.5f, -0.5f, 0.0f},    {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+        //     {{0.5f, -0.5f, 0.0f},     {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+        //     {{0.5f, 0.5f, 0.0f},      {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+        //     {{-0.5f, 0.5f, 0.0f},     {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},
 
-            {{-0.5f, -0.5f, -0.5f},   {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-            {{0.5f, -0.5f, -0.5f},    {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-            {{0.5f, 0.5f, -0.5f},     {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
-            {{-0.5f, 0.5f, -0.5f},    {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}
-        };
-        const std::vector<uint32_t> indices = {
-            0, 1, 2, 2, 3, 0,
-            4, 5, 6, 6, 7, 4
-        };
+        //     {{-0.5f, -0.5f, -0.5f},   {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+        //     {{0.5f, -0.5f, -0.5f},    {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+        //     {{0.5f, 0.5f, -0.5f},     {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+        //     {{-0.5f, 0.5f, -0.5f},    {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}
+        // };
+        std::vector<Vertex> vertices;
+        // const std::vector<uint32_t> indices = {
+        //     0, 1, 2, 2, 3, 0,
+        //     4, 5, 6, 6, 7, 4
+        // };
+        std::vector<uint32_t> indices;
 
     const int MAX_FRAMES_IN_FLIGHT = 2;
     uint32_t currentFrame;
@@ -235,10 +238,10 @@ class App {
             float deltatime = std::chrono::duration<float, std::chrono::seconds::period>(current - startTime).count();
 
             UniformBufferObject ubo{};
-            ubo.model = glm::rotate(glm::mat4(1.0f), deltatime * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-            ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-            ubo.proj = glm::perspective(glm::radians(45.0f), swapchainExtent.width / (float) swapchainExtent.height, 0.1f, 10.0f);
-            ubo.proj[1][1] *= -1;
+            ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(-45.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+            ubo.view = glm::lookAt(glm::vec3(5.0f, 3.0f, 5.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+            ubo.proj = glm::perspective(glm::radians(45.0f), swapchainExtent.width / (float) swapchainExtent.height, 0.1f, 30.0f);
+            //ubo.proj[1][1] *= -1;
             memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
         }
 
@@ -562,6 +565,40 @@ class App {
 
             vkDestroyBuffer(device, stagingBuffer, nullptr);
             vkFreeMemory(device, stagingBufferMemory, nullptr);
+        }
+
+        void loadModel()
+        {
+            tinyobj::attrib_t attrib;
+            std::vector<tinyobj::shape_t> shapes;
+            std::vector<tinyobj::material_t> materials;
+            std::string warn, err;
+
+            if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, "teapot.obj"))
+                throw std::runtime_error(warn + err);
+
+            for (const auto& shape : shapes) 
+            {
+                for (const auto& index : shape.mesh.indices) 
+                {
+                    Vertex vertex{};
+                    vertex.pos = {
+                        attrib.vertices[3 * index.vertex_index + 0],
+                        attrib.vertices[3 * index.vertex_index + 1],
+                        attrib.vertices[3 * index.vertex_index + 2]
+                    };
+
+                    // vertex.texCoord = {
+                    //     attrib.texcoords[2 * index.texcoord_index + 0],
+                    //     attrib.texcoords[2 * index.texcoord_index + 1]
+                    // };
+
+                    vertex.color = {1.0f, 1.0f, 1.0f};
+
+                    vertices.push_back(vertex);
+                    indices.push_back(indices.size());
+                }
+            }
         }
 
         void makeVertexBuffer()
@@ -1418,6 +1455,8 @@ class App {
             makeCommandBuffer();
 
             /* Vertex Buffer */
+            loadModel();
+
             makeVertexBuffer();
             makeIndexBuffer();
             makeUniformBuffers();

@@ -1,10 +1,10 @@
 NAME=triangle
 CXX=c++
-CXXFLAGS= -std=c++17 -Ofast -DDEBUG -g -I/home/kali/.lib/stb -Wall -Wextra
+CXXFLAGS= -std=c++17 -Ofast -DDEBUG -g -I/home/kali/.libs/stb -I/home/kali/.libs/tinyobjloader
 LDFLAGS = -lglfw -lvulkan -ldl -lpthread -lX11 -lXxf86vm -lXrandr -lXi
 
-SRC=test.cpp
 SRC=main.cpp
+# SRC=test.cpp
 OBJ=$(SRC:.cpp=.o)
 SHADERS=shader.frag shader.vert
 SPV=frag.spv vert.spv
