@@ -1,6 +1,10 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+
+#define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -36,14 +40,14 @@ static std::vector<char> readShader(const std::string& filename)
     file.close();
     return buffer;
 }
+struct UniformBufferObject {
+    glm::mat4 model;
+    glm::mat4 view;
+    glm::mat4 proj;
+};
 
 class App {
 
-    struct UniformBufferObject {
-        glm::mat4 model;
-        glm::mat4 view;
-        glm::mat4 proj;
-    };
 
     struct Vertex {
         glm::vec2 pos;
@@ -223,19 +227,19 @@ class App {
 
             if (res == VK_ERROR_OUT_OF_DATE_KHR)
             {
-                frameResize = false;
                 remakeSwapChain();
                 return;
             }
             else if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
                 throw std::runtime_error("Failed to get next image");
 
+            updateUniformBuffer(currentFrame);
+            
             vkResetFences(device, 1, &inFlightFences[currentFrame]);
 
             vkResetCommandBuffer(commandBuffers[currentFrame], 0);
             recordCommandBuffer(commandBuffers[currentFrame], image);
 
-            updateUniformBuffer(currentFrame);
 
             VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
 
@@ -296,30 +300,30 @@ class App {
 
             vkCmdBeginRenderPass(buffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-            vkCmdBindPipeline(buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+                vkCmdBindPipeline(buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
-            VkViewport viewport{};
-            viewport.x = 0.0f;
-            viewport.y = 0.0f;
-            viewport.width = (float) swapchainExtent.width;
-            viewport.height = (float) swapchainExtent.height;
-            viewport.minDepth = 0.0f;
-            viewport.maxDepth = 1.0f;
-            vkCmdSetViewport(buffer, 0, 1, &viewport);
+                VkViewport viewport{};
+                viewport.x = 0.0f;
+                viewport.y = 0.0f;
+                viewport.width = (float) swapchainExtent.width;
+                viewport.height = (float) swapchainExtent.height;
+                viewport.minDepth = 0.0f;
+                viewport.maxDepth = 1.0f;
+                vkCmdSetViewport(buffer, 0, 1, &viewport);
 
-            VkRect2D scissor{};
-            scissor.offset = {0, 0};
-            scissor.extent = swapchainExtent;
-            vkCmdSetScissor(buffer, 0, 1, &scissor);
+                VkRect2D scissor{};
+                scissor.offset = {0, 0};
+                scissor.extent = swapchainExtent;
+                vkCmdSetScissor(buffer, 0, 1, &scissor);
 
-            /* extra binding if im not mistaken */
-            VkBuffer vertexBuffers[] = {vertexBuffer};
-            VkDeviceSize offsets[] = {0};
-            vkCmdBindVertexBuffers(buffer, 0, 1, vertexBuffers, offsets);
-            vkCmdBindIndexBuffer(buffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+                /* extra binding if im not mistaken */
+                VkBuffer vertexBuffers[] = {vertexBuffer};
+                VkDeviceSize offsets[] = {0};
+                vkCmdBindVertexBuffers(buffer, 0, 1, vertexBuffers, offsets);
+                vkCmdBindIndexBuffer(buffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-            vkCmdBindDescriptorSets(buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
-            vkCmdDrawIndexed(buffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+                vkCmdBindDescriptorSets(buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
+                vkCmdDrawIndexed(buffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 
             vkCmdEndRenderPass(buffer);
             if (vkEndCommandBuffer(buffer) != VK_SUCCESS)
@@ -373,11 +377,10 @@ class App {
 
             vkBeginCommandBuffer(commandBuffer, &beginInfo);
 
-            VkBufferCopy copyRegion{};
-            copyRegion.srcOffset = 0;
-            copyRegion.dstOffset = 0;
-            copyRegion.size = size;
-            vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+                VkBufferCopy copyRegion{};
+                copyRegion.size = size;
+                vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+
             vkEndCommandBuffer(commandBuffer);
 
             VkSubmitInfo submitInfo{};
@@ -473,12 +476,32 @@ class App {
             uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
             uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
 
-            for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+            for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
             {
                 makeBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                     VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
                 vkMapMemory(device, uniformBuffersMemory[i], 0, bufferSize, 0, &uniformBuffersMapped[i]);
             }
+        }
+
+        void makeTextureImage()
+        {
+            int texWidth, texHeight, texChannels;
+            stbi_uc* pixels = stbi_load("swmg.jpg", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+            VkDeviceSize imageSize = texWidth * texHeight * 4;
+
+            if (!pixels) {
+                throw std::runtime_error("Failed to load texture image!");
+
+            VkBuffer stagingBuffer;
+            VkDeviceMemory stagingBufferMemory;
+
+            makeBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+            void *data;
+            vkMapMemory(device, stagingBufferMemory, 0, imageSize, 0, &data);
+                memcpy(data, pixels, imageSize);
+            vkUnmapMemory(device, stagingBufferMemory);
+    }
         }
 
         void makeCommandPool()
@@ -534,8 +557,8 @@ class App {
             uboLayoutBinding.descriptorCount = 1;
             uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 
-            uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
             uboLayoutBinding.pImmutableSamplers = nullptr;
+            uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
             VkDescriptorSetLayoutCreateInfo layoutInfo{};
             layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -544,11 +567,6 @@ class App {
 
             if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS)
                 throw std::runtime_error("Failed to create descriptor set layout");
-
-            VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
-            pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-            pipelineLayoutCreateInfo.setLayoutCount = 1;
-            pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayout;
         }
 
         void makeDescriptorSets()
@@ -670,9 +688,6 @@ class App {
 
             VkPipelineShaderStageCreateInfo pipelineShaderStageCreateInfo[] = {vertexShaderStageCreateInfo, fragmentShaderStageCreateInfo};
 
-            /* HALF ASLEEP PLEASE REVIEW TMRW FOR REASONS, MOSTLY OUT OF TEXTBOOK */
-            /* Viewport setup with scisor and the viewport itself */
-
             auto bindingDescription = Vertex::getBindingDescription();
             auto attributeDescription = Vertex::getAttributeDescriptions();
 
@@ -682,7 +697,6 @@ class App {
             pipelineVertexInputStateCreateInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescription.size());
             pipelineVertexInputStateCreateInfo.pVertexBindingDescriptions = &bindingDescription;
             pipelineVertexInputStateCreateInfo.pVertexAttributeDescriptions = attributeDescription.data();
-
 
             VkPipelineInputAssemblyStateCreateInfo pipelineInputAssemblyStateCreateInfo{};
             pipelineInputAssemblyStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -725,7 +739,7 @@ class App {
             pipelineRasterizationCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;
             pipelineRasterizationCreateInfo.lineWidth = 1.0f;
             pipelineRasterizationCreateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
-            pipelineRasterizationCreateInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;
+            pipelineRasterizationCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
             pipelineRasterizationCreateInfo.depthBiasEnable = VK_FALSE;
 
             /* JUST TAKEN, all defaults, used to antialias*/
@@ -1105,6 +1119,7 @@ class App {
 
             /* Pools */
             makeCommandPool();
+            makeTextureImage();
             makeCommandBuffer();
 
             /* Vertex Buffer */

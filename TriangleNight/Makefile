@@ -1,8 +1,9 @@
 NAME=triangle
 CXX=c++
-CXXFLAGS= -std=c++17 -Ofast -DDEBUG -g
+CXXFLAGS= -std=c++17 -Ofast -DDEBUG -g -I/home/kali/.lib/stb -Wall -Wextra
 LDFLAGS = -lglfw -lvulkan -ldl -lpthread -lX11 -lXxf86vm -lXrandr -lXi
 
+SRC=test.cpp
 SRC=main.cpp
 OBJ=$(SRC:.cpp=.o)
 SHADERS=shader.frag shader.vert
