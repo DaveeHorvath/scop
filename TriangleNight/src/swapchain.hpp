@@ -7,12 +7,6 @@
 #include <stdexcept>
 #include <optional>
 
-struct QueueFamilyIndicies
-{
-    std::optional<uint32_t> graphicsFamily;
-    std::optional<uint32_t> presentFamily;
-};
-
 struct SwapChainSupportDetails
 {
     VkSurfaceCapabilitiesKHR capabilities;
@@ -21,7 +15,6 @@ struct SwapChainSupportDetails
 };
 
 VkImageView makeImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
-QueueFamilyIndicies findQueueFamilyIndicies(VkPhysicalDevice dev);
 
 class Swapchain {
     private:
@@ -38,6 +31,7 @@ class Swapchain {
         VkExtent2D swapchainExtent;
         std::vector<VkImage> swapchainImages;
         std::vector<VkImageView> swapchainImagesViews;
+        uint32_t swapchainImageCount = 0;
         void makeSwapchain();
         void remakeSwapchain();
         void cleanupSwapChain();

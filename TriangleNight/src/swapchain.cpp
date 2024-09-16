@@ -1,4 +1,5 @@
 #include "swapchain.hpp"
+#include "QueueFamilyIndicies.hpp"
 
 void Swapchain::makeSwapchain()
 {
@@ -19,7 +20,7 @@ void Swapchain::makeSwapchain()
     swapchainCreateInfo.imageArrayLayers = 1;
     swapchainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     swapchainCreateInfo.presentMode = pickSwapPresentMode(details.modes);
-    QueueFamilyIndicies indicies = findQueueFamilyIndicies(physicalDevice);
+    QueueFamilyIndicies indicies = QueueFamilyIndicies::findQueueFamilyIndicies(physicalDevice, surface);
     uint32_t queueFamilyIndices[] = {indicies.graphicsFamily.value(), indicies.presentFamily.value()};
     if (indicies.graphicsFamily != indicies.presentFamily) 
     {
@@ -35,8 +36,6 @@ void Swapchain::makeSwapchain()
     swapchainCreateInfo.oldSwapchain = nullptr;
     if (vkCreateSwapchainKHR(device, &swapchainCreateInfo, nullptr, &swapchain) != VK_SUCCESS)
         throw std::runtime_error("Failed to create swapchain");
-
-    uint32_t swapchainImageCount = 0;
 
     /* Make swapchain images */
     vkGetSwapchainImagesKHR(device, swapchain, &swapchainImageCount, nullptr);
