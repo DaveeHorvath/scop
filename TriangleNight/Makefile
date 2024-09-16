@@ -4,22 +4,28 @@ LIBS=/home/dhorvath/.libs
 CXXFLAGS= -std=c++17 -Ofast -DDEBUG -g -I$(LIBS)/stb
 LDFLAGS = -lglfw -lvulkan -ldl -lpthread -lX11 -lXxf86vm -lXrandr -lXi
 
-SRC=main.cpp
-# SRC=test.cpp
-OBJ=$(SRC:.cpp=.o)
-SHADERS=shader.frag shader.vert
-SPV=frag.spv vert.spv
+SRC_FILE=main.cpp
+SRC_DIR =src/
+SRC=$(addprefix $(SRC_DIR), $(SRC_FILE))
+OBJ_DIR = obj/
+OBJ=$(addprefix $(OBJ_DIR), $(notdir $(SRC:.cpp=.o)))
+SHADER_DIR = shaders/
+SHADERS=$(addprefix $(SHADER_DIR), shader.frag shader.vert)
+SPV=$(addprefix $(SHADER_DIR), frag.spv vert.spv)
 
 test: $(NAME)
 	./triangle
 
-%.spv: shader.%
+$(SHADER_DIR)%.spv: $(SHADER_DIR)shader.%
 	glslc $< -o $@
 
-$(NAME): $(OBJ) $(SPV)
+$(NAME): $(OBJ_DIR) $(OBJ) $(SPV)
 	$(CXX) $(CXXFLAGS) -o $(NAME) $(OBJ) $(LDFLAGS)
 
-%.o: %.cpp
+$(OBJ_DIR):
+	mkdir -p $(OBJ_DIR)
+
+$(OBJ_DIR)%.o: $(SRC_DIR)%.cpp
 	$(CXX) $(CXXFLAGS) -c -o $(NAME) $< -o $@ 
 
 clean:

@@ -47,8 +47,6 @@ struct UniformBufferObject {
 };
 
 class App {
-
-
     struct Vertex {
         glm::vec3 pos;
         glm::vec3 color;
@@ -83,25 +81,8 @@ class App {
             return attributeDescriptions;
         };
     };
-
-
-        // const std::vector<Vertex> vertices = {
-        //     {{-0.5f, -0.5f, 0.0f},    {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-        //     {{0.5f, -0.5f, 0.0f},     {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-        //     {{0.5f, 0.5f, 0.0f},      {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
-        //     {{-0.5f, 0.5f, 0.0f},     {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},
-
-        //     {{-0.5f, -0.5f, -0.5f},   {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-        //     {{0.5f, -0.5f, -0.5f},    {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-        //     {{0.5f, 0.5f, -0.5f},     {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
-        //     {{-0.5f, 0.5f, -0.5f},    {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}
-        // };
-        std::vector<Vertex> vertices;
-        // const std::vector<uint32_t> indices = {
-        //     0, 1, 2, 2, 3, 0,
-        //     4, 5, 6, 6, 7, 4
-        // };
-        std::vector<uint32_t> indices;
+    std::vector<Vertex> vertices;
+    std::vector<uint32_t> indices;
 
     const int MAX_FRAMES_IN_FLIGHT = 2;
     uint32_t currentFrame;
@@ -112,14 +93,6 @@ class App {
         std::optional<uint32_t> presentFamily;
     };
 
-    struct SwapChainSupportDetails
-    {
-        VkSurfaceCapabilitiesKHR capabilities;
-        std::vector<VkSurfaceFormatKHR> formats;
-        std::vector<VkPresentModeKHR> modes;
-    };
-
-    
     public:
         GLFWwindow *win;
         VkInstance instance;
@@ -132,6 +105,16 @@ class App {
             const bool enableValidationLayers = false;
         #endif
 
+
+        void run()
+        {
+            init_window();
+            init_vk();
+            loop();
+            clean();
+        }
+    private:
+
         VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
         VkDevice device = VK_NULL_HANDLE;
         VkQueue graphicsQueue;
@@ -139,11 +122,11 @@ class App {
 
         VkSwapchainKHR swapchain;
         VkSurfaceKHR surface;
-        VkFormat swapchainImageFormat;
-        VkExtent2D swapchainExtent;
 
-        std::vector<VkImage> swapchainImages;
-        std::vector<VkImageView> swapchainImagesViews;
+        // VkFormat swapchainImageFormat;
+        // VkExtent2D swapchainExtent;
+        // std::vector<VkImage> swapchainImages;
+        // std::vector<VkImageView> swapchainImagesViews;
 
         VkRenderPass renderPass;
         VkDescriptorSetLayout descriptorSetLayout;
@@ -160,8 +143,10 @@ class App {
         std::vector<VkSemaphore> renderFinishedSemaphores;
         std::vector<VkFence> inFlightFences;
 
+        /* should be a class*/
         VkBuffer vertexBuffer;
         VkDeviceMemory vertexBufferMemory;
+        /* end of class */
 
         VkBuffer indexBuffer;
         VkDeviceMemory indexBufferMemory;
@@ -173,23 +158,23 @@ class App {
         VkDescriptorPool descriptorPool;
         std::vector<VkDescriptorSet> descriptorSets;
 
+
+        /*
+         should be a class
+        */
         VkImage textureImage;
         VkDeviceMemory textureImageMemory;
         VkImageView textureImageView;
         VkSampler textureSampler;
+        /*
+         end of class
+        */
 
         VkImage depthImage;
         VkDeviceMemory depthImageMemory;
         VkImageView depthImageView;
 
-        void run()
-        {
-            init_window();
-            init_vk();
-            loop();
-            clean();
-        }
-    private:
+
         bool check_validation_layer_support()
         {
             uint32_t layerCount = 0;
@@ -1000,8 +985,8 @@ class App {
 
         void makePipeline()
         {
-            std::vector<char> vertexShader = readShader("vert.spv");
-            std::vector<char> fragmentShader = readShader("frag.spv");
+            std::vector<char> vertexShader = readShader("shaders/vert.spv");
+            std::vector<char> fragmentShader = readShader("shaders/frag.spv");
 
             VkShaderModule vertexShaderModule = makeShaderModule(vertexShader);
             VkShaderModule fragmentShaderModule = makeShaderModule(fragmentShader);
@@ -1165,60 +1150,60 @@ class App {
             makeFrameBuffer();
         }
 
-        void makeSwapChain()
-        {   
-            SwapChainSupportDetails details = findSwapChainSupportDetails(physicalDevice);
-            uint32_t imageCount = details.capabilities.minImageCount + 1;
-            if (details.capabilities.maxImageCount > 0 && imageCount > details.capabilities.maxImageCount)
-                imageCount = details.capabilities.maxImageCount;
+        // void makeSwapChain()
+        // {   
+        //     SwapChainSupportDetails details = findSwapChainSupportDetails(physicalDevice);
+        //     uint32_t imageCount = details.capabilities.minImageCount + 1;
+        //     if (details.capabilities.maxImageCount > 0 && imageCount > details.capabilities.maxImageCount)
+        //         imageCount = details.capabilities.maxImageCount;
 
-            VkSurfaceFormatKHR surfaceFormat = pickSurfaceFormat(details.formats);
-            VkSwapchainCreateInfoKHR swapchainCreateInfo{};
-            swapchainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-            swapchainCreateInfo.surface = surface;
-            swapchainCreateInfo.minImageCount = imageCount;
+        //     VkSurfaceFormatKHR surfaceFormat = pickSurfaceFormat(details.formats);
+        //     VkSwapchainCreateInfoKHR swapchainCreateInfo{};
+        //     swapchainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+        //     swapchainCreateInfo.surface = surface;
+        //     swapchainCreateInfo.minImageCount = imageCount;
 
-            swapchainImageFormat = surfaceFormat.format;
-            swapchainCreateInfo.imageFormat = swapchainImageFormat;
-            swapchainCreateInfo.imageColorSpace = surfaceFormat.colorSpace;
+        //     swapchainImageFormat = surfaceFormat.format;
+        //     swapchainCreateInfo.imageFormat = swapchainImageFormat;
+        //     swapchainCreateInfo.imageColorSpace = surfaceFormat.colorSpace;
 
-            swapchainExtent = pickSwapChainExtent(details.capabilities);
-            swapchainCreateInfo.imageExtent = swapchainExtent;
-            swapchainCreateInfo.imageArrayLayers = 1;
-            swapchainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-            swapchainCreateInfo.presentMode = pickSwapPresentMode(details.modes);
+        //     swapchainExtent = pickSwapChainExtent(details.capabilities);
+        //     swapchainCreateInfo.imageExtent = swapchainExtent;
+        //     swapchainCreateInfo.imageArrayLayers = 1;
+        //     swapchainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        //     swapchainCreateInfo.presentMode = pickSwapPresentMode(details.modes);
 
-            QueueFamilyIndicies indicies = findQueueFamilyIndicies(physicalDevice);
-            uint32_t queueFamilyIndices[] = {indicies.graphicsFamily.value(), indicies.presentFamily.value()};
+        //     QueueFamilyIndicies indicies = findQueueFamilyIndicies(physicalDevice);
+        //     uint32_t queueFamilyIndices[] = {indicies.graphicsFamily.value(), indicies.presentFamily.value()};
 
-            if (indicies.graphicsFamily != indicies.presentFamily) 
-            {
-                swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-                swapchainCreateInfo.queueFamilyIndexCount = 2;
-                swapchainCreateInfo.pQueueFamilyIndices = queueFamilyIndices;
-            }
-            else
-                swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        //     if (indicies.graphicsFamily != indicies.presentFamily) 
+        //     {
+        //         swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+        //         swapchainCreateInfo.queueFamilyIndexCount = 2;
+        //         swapchainCreateInfo.pQueueFamilyIndices = queueFamilyIndices;
+        //     }
+        //     else
+        //         swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-            swapchainCreateInfo.preTransform = details.capabilities.currentTransform;
-            swapchainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-            swapchainCreateInfo.clipped = VK_TRUE;
-            swapchainCreateInfo.oldSwapchain = nullptr;
+        //     swapchainCreateInfo.preTransform = details.capabilities.currentTransform;
+        //     swapchainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+        //     swapchainCreateInfo.clipped = VK_TRUE;
+        //     swapchainCreateInfo.oldSwapchain = nullptr;
 
 
-            if (vkCreateSwapchainKHR(device, &swapchainCreateInfo, nullptr, &swapchain) != VK_SUCCESS)
-                throw std::runtime_error("Failed to create swapchain");
+        //     if (vkCreateSwapchainKHR(device, &swapchainCreateInfo, nullptr, &swapchain) != VK_SUCCESS)
+        //         throw std::runtime_error("Failed to create swapchain");
 
-            uint32_t swapchainImageCount = 0;
+            // uint32_t swapchainImageCount = 0;
 
-            /* Make swapchain images */
-            vkGetSwapchainImagesKHR(device, swapchain, &swapchainImageCount, nullptr);
-            swapchainImages.resize(swapchainImageCount);
-            vkGetSwapchainImagesKHR(device, swapchain, &swapchainImageCount, swapchainImages.data());
-            /* Make swapchain image views */
-            swapchainImagesViews.resize(swapchainImages.size());
-            for (int i = 0; i < swapchainImages.size(); i++)
-                swapchainImagesViews[i] = makeImageView(swapchainImages[i], swapchainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
+            // /* Make swapchain images */
+            // vkGetSwapchainImagesKHR(device, swapchain, &swapchainImageCount, nullptr);
+            // swapchainImages.resize(swapchainImageCount);
+            // vkGetSwapchainImagesKHR(device, swapchain, &swapchainImageCount, swapchainImages.data());
+            // /* Make swapchain image views */
+            // swapchainImagesViews.resize(swapchainImages.size());
+            // for (int i = 0; i < swapchainImages.size(); i++)
+            //     swapchainImagesViews[i] = makeImageView(swapchainImages[i], swapchainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
 
         }
 
@@ -1300,61 +1285,6 @@ class App {
                 index++;
             }
             return indicies;
-        }
-
-        SwapChainSupportDetails findSwapChainSupportDetails(VkPhysicalDevice dev)
-        {
-            SwapChainSupportDetails details;
-
-            vkGetPhysicalDeviceSurfaceCapabilitiesKHR(dev, surface, &details.capabilities);
-
-            uint32_t formatCount = 0;
-            vkGetPhysicalDeviceSurfaceFormatsKHR(dev, surface, &formatCount, nullptr);
-            if (formatCount)
-            {
-                details.formats.resize(formatCount);
-                vkGetPhysicalDeviceSurfaceFormatsKHR(dev, surface, &formatCount, details.formats.data());
-            }
-
-            uint32_t modesCount = 0;
-            vkGetPhysicalDeviceSurfacePresentModesKHR(dev, surface, &modesCount, nullptr);
-            if (modesCount)
-            {
-                details.modes.resize(modesCount);
-                vkGetPhysicalDeviceSurfacePresentModesKHR(dev, surface, &modesCount, details.modes.data());
-            }
-
-            return details;
-        }
-
-        VkSurfaceFormatKHR pickSurfaceFormat(const std::vector<VkSurfaceFormatKHR> formats)
-        {
-            for (const auto& format : formats) 
-            {
-                if (format.format == VK_FORMAT_B8G8R8A8_SRGB && format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
-                    return format;
-            }
-            return formats[0];
-        }
-
-        VkSurfaceFormatKHR pickSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& formats) 
-        {
-            for (const auto& format : formats) {
-            if (format.format == VK_FORMAT_B8G8R8A8_SRGB && format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-                    return format;
-                }
-            }
-            return formats[0];
-        }
-
-        VkPresentModeKHR pickSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes) 
-        {
-            return VK_PRESENT_MODE_FIFO_KHR;
-        }
-
-        VkExtent2D pickSwapChainExtent(const VkSurfaceCapabilitiesKHR& capabilities)
-        {
-            return capabilities.currentExtent;
         }
 
         void pickPhysicalDevice()
