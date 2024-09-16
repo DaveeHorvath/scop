@@ -1,9 +1,6 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-#define TINYOBJLOADER_IMPLEMENTATION
-#include <tiny_obj_loader.h>
-
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
@@ -22,6 +19,7 @@
 #include <set>
 #include <optional>
 #include <fstream>
+#include <sstream>
 
 #include <string.h>
 
@@ -238,9 +236,9 @@ class App {
             float deltatime = std::chrono::duration<float, std::chrono::seconds::period>(current - startTime).count();
 
             UniformBufferObject ubo{};
-            ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(-45.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-            ubo.view = glm::lookAt(glm::vec3(5.0f, 3.0f, 5.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-            ubo.proj = glm::perspective(glm::radians(45.0f), swapchainExtent.width / (float) swapchainExtent.height, 0.1f, 30.0f);
+            ubo.model = glm::rotate(glm::mat4(1.0f), deltatime * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+            ubo.view = glm::lookAt(glm::vec3(5.0f, 5.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f));
+            ubo.proj = glm::perspective(glm::radians(90.0f), swapchainExtent.width / (float) swapchainExtent.height, 0.1f, 30.0f);
             //ubo.proj[1][1] *= -1;
             memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
         }
@@ -569,35 +567,44 @@ class App {
 
         void loadModel()
         {
-            tinyobj::attrib_t attrib;
-            std::vector<tinyobj::shape_t> shapes;
-            std::vector<tinyobj::material_t> materials;
-            std::string warn, err;
-
-            if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, "teapot.obj"))
-                throw std::runtime_error(warn + err);
-
-            for (const auto& shape : shapes) 
+            std::vector<Vertex> read_verticies;
+            std::vector<int> read_indicies;
+            std::ifstream file{"teapot.obj"};
+            if (!file.is_open())
+                throw std::runtime_error("Failed to open file");
+            for (std::string line; std::getline(file, line); )
             {
-                for (const auto& index : shape.mesh.indices) 
+                std::stringstream ss{line};
+                char type;
+                ss >> type;
+                if (type == 'v')
                 {
-                    Vertex vertex{};
-                    vertex.pos = {
-                        attrib.vertices[3 * index.vertex_index + 0],
-                        attrib.vertices[3 * index.vertex_index + 1],
-                        attrib.vertices[3 * index.vertex_index + 2]
-                    };
-
-                    // vertex.texCoord = {
-                    //     attrib.texcoords[2 * index.texcoord_index + 0],
-                    //     attrib.texcoords[2 * index.texcoord_index + 1]
-                    // };
-
-                    vertex.color = {1.0f, 1.0f, 1.0f};
-
-                    vertices.push_back(vertex);
-                    indices.push_back(indices.size());
+                    Vertex v;
+                    ss >> v.pos.x >> v.pos.y >> v.pos.z;
+                    read_verticies.push_back(v);
                 }
+                else if (type == 'f')
+                {
+                    std::vector<int> face;
+                    face.clear();
+                    for (std::string item; std::getline(ss, item, ' ');)
+                    {
+                        if (item != "")
+                            face.push_back(std::stoi(item));
+                    }
+                    for (int i = 0; i + 2 < face.size(); i++)
+                    {
+                        read_indicies.push_back(face[i]);
+                        read_indicies.push_back(face[i + 1]);
+                        read_indicies.push_back(face[i + 2]);
+                    }
+                }
+            }
+
+            for (auto& i : read_indicies)
+            {
+                indices.push_back(indices.size());
+                vertices.push_back(read_verticies[i - 1]);
             }
         }
 
@@ -1067,7 +1074,6 @@ class App {
             pipelineRasterizationCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
             pipelineRasterizationCreateInfo.depthBiasEnable = VK_FALSE;
 
-            /* JUST TAKEN, all defaults, used to antialias*/
             VkPipelineMultisampleStateCreateInfo pipelineMultisampleStateCreateInfo{};
             pipelineMultisampleStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
             pipelineMultisampleStateCreateInfo.sampleShadingEnable = VK_FALSE;

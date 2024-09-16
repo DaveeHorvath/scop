@@ -1,6 +1,7 @@
 NAME=triangle
 CXX=c++
-CXXFLAGS= -std=c++17 -Ofast -DDEBUG -g -I/home/kali/.libs/stb -I/home/kali/.libs/tinyobjloader
+LIBS=/home/dhorvath/.libs
+CXXFLAGS= -std=c++17 -Ofast -DDEBUG -g -I$(LIBS)/stb
 LDFLAGS = -lglfw -lvulkan -ldl -lpthread -lX11 -lXxf86vm -lXrandr -lXi
 
 SRC=main.cpp
