@@ -32,12 +32,12 @@ public:
     inline static VkCommandPool commandPool;
     std::vector<VkCommandBuffer> commandBuffers;
 
-    inline static VkDescriptorPool descriptorPool;
+    VkDescriptorPool descriptorPool;
     std::vector<VkDescriptorSet> descriptorSets;
 
     static VkCommandBuffer beginSingleTimeCommands();
     static void endSingleTimeCommands(VkCommandBuffer buffer);
-    void recordCommandBuffer(VkCommandBuffer buffer, uint32_t image, Buffer vertexBuffer, Buffer indexBuffer, Model model);
+    void recordCommandBuffer(VkCommandBuffer buffer, uint32_t image, uint32_t currentFrame , Buffer vertexBuffer, Buffer indexBuffer, Model model);
 
     void makeCommandPool();
     void makeCommandBuffer();

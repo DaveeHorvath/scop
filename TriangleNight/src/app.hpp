@@ -42,12 +42,7 @@ class App {
         Window window;
         bool frameResize = false;
 
-        void run()
-        {
-            init();
-            loop();
-            clean();
-        }
+        void run();
     private:
         VulkanInstance instance;
         // VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
@@ -114,28 +109,7 @@ class App {
         void drawFrame();
         
         // needs to move somewhere, unsure atm
-        void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height)
-        {
-            VkCommandBuffer commandBuffer = RenderPipeline::beginSingleTimeCommands();
-                VkBufferImageCopy region{};
-                region.bufferOffset = 0;
-                region.bufferRowLength = 0;
-                region.bufferImageHeight = 0;
-
-                region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-                region.imageSubresource.mipLevel = 0;
-                region.imageSubresource.baseArrayLayer = 0;
-                region.imageSubresource.layerCount = 1;
-
-                region.imageOffset = {0, 0, 0};
-                region.imageExtent = {
-                    width,
-                    height,
-                    1
-                };
-                vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-            RenderPipeline::endSingleTimeCommands(commandBuffer);
-        }
+        void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
         void makeIndexBuffer();
         void makeVertexBuffer();
         void makeUniformBuffers();
@@ -143,56 +117,8 @@ class App {
         void makeTextureImage();
 
         void makeDepthResources();        
-        void init()
-        {
-            window.init();
-            std::cout << "instance creation\n";
-            instance.init();
-            // init_window();
-
-            /* Surface*/
-            instance.createSurface();
-
-            /* device selection and creation */
-            instance.pickPhysicalDevice();
-            instance.makeLogicalDevice();
-
-            std::cout << "swapchain creation\n";
-            /* SwapChain */
-            swapchain.makeSwapchain();
-
-            /* pipeline */
-            std::cout << "renderpipeline creation\n";
-            renderpipeline.makeRenderPass(depth);
-            renderpipeline.makeDescriptorSetLayout();
-            renderpipeline.makePipeline();
-            renderpipeline.makeCommandPool();
-            std::cout << "depth resource\n";
-            makeDepthResources();
-            std::cout << "frame buffer\n";
-            renderpipeline.makeFrameBuffer(depth);
-            std::cout << "texture image\n";
-            makeTextureImage();
-            texture.makeImageView(VK_IMAGE_ASPECT_COLOR_BIT);
-            texture.makeImageSampler();
-            std::cout << "cmdbuffer\n";
-            renderpipeline.makeCommandBuffer();
-
-            /* Vertex Buffer */
-            std::cout << "model creation\n";
-            model.loadModel();
-
-            std::cout << "buffer creation\n";
-            makeVertexBuffer();
-            makeIndexBuffer();
-            makeUniformBuffers();
-            renderpipeline.makeDescriptorPool();
-            renderpipeline.makeDescriptorSets(uniformBuffers, texture);
-
-            /* Sync */
-            std::cout << "sync creation\n";
-            syncobjects.makeSyncObjects();
-        }
+        void init();
+        
         void loop();
         
         void clean();

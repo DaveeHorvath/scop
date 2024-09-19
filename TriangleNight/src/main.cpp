@@ -11,7 +11,7 @@ int main()
     }
     catch(const std::exception& e)
     {
-        std::cerr << e.what() << '\n';
+        std::cerr << "\033[1;31" << e.what() << "\033[0m" << '\n';
         exit(69);
     }
 }

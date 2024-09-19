@@ -22,9 +22,9 @@ void App::updateUniformBuffer(uint32_t currentImage)
 
 void App::drawFrame()
 {
-    vkWaitForFences(instance.device, 1, &syncobjects.inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
+    vkWaitForFences(VulkanInstance::device, 1, &syncobjects.inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
     uint32_t image;
-    VkResult res = vkAcquireNextImageKHR(instance.device, swapchain.swapchain, UINT64_MAX, syncobjects.imageDoneSemaphores[currentFrame], VK_NULL_HANDLE, &image);
+    VkResult res = vkAcquireNextImageKHR(VulkanInstance::device, Swapchain::swapchain, UINT64_MAX, syncobjects.imageDoneSemaphores[currentFrame], VK_NULL_HANDLE, &image);
 
     if (res == VK_ERROR_OUT_OF_DATE_KHR)
     {
@@ -36,10 +36,10 @@ void App::drawFrame()
 
     updateUniformBuffer(currentFrame);
 
-    vkResetFences(instance.device, 1, &syncobjects.inFlightFences[currentFrame]);
+    vkResetFences(VulkanInstance::device, 1, &syncobjects.inFlightFences[currentFrame]);
 
     vkResetCommandBuffer(renderpipeline.commandBuffers[currentFrame], 0);
-    renderpipeline.recordCommandBuffer(renderpipeline.commandBuffers[currentFrame], image, vertexBuffer, indexBuffer, model);
+    renderpipeline.recordCommandBuffer(renderpipeline.commandBuffers[currentFrame], image, currentFrame, vertexBuffer, indexBuffer, model);
 
     VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
 
@@ -53,7 +53,7 @@ void App::drawFrame()
     submitInfo.pWaitSemaphores = &syncobjects.imageDoneSemaphores[currentFrame];
     submitInfo.pWaitDstStageMask = waitStages;
 
-    if (vkQueueSubmit(renderpipeline.graphicsQueue, 1, &submitInfo, syncobjects.inFlightFences[currentFrame]) != VK_SUCCESS)
+    if (vkQueueSubmit(RenderPipeline::graphicsQueue, 1, &submitInfo, syncobjects.inFlightFences[currentFrame]) != VK_SUCCESS)
         throw std::runtime_error("Failed to submit to queue");
 
     VkPresentInfoKHR presentInfo{};
@@ -64,7 +64,7 @@ void App::drawFrame()
     presentInfo.waitSemaphoreCount = 1;
     presentInfo.pWaitSemaphores = &syncobjects.renderFinishedSemaphores[currentFrame];
 
-    res = vkQueuePresentKHR(renderpipeline.graphicsQueue, &presentInfo);
+    res = vkQueuePresentKHR(RenderPipeline::graphicsQueue, &presentInfo);
 
     if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR || frameResize)
     {
@@ -94,7 +94,7 @@ void App::makeIndexBuffer()
     vkUnmapMemory(instance.device, stagingBufferMemory);
 
     Buffer::makeBuffer(deviceSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer.buffer, indexBuffer.bufferMemory);
+                       VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer.buffer, indexBuffer.bufferMemory);
 
     Buffer::copyBuffer(stagingBuffer, indexBuffer.buffer, deviceSize);
 
@@ -118,7 +118,7 @@ void App::makeVertexBuffer()
     vkUnmapMemory(instance.device, stagingBufferMemory);
 
     Buffer::makeBuffer(deviceSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer.buffer, vertexBuffer.bufferMemory);
+                       VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer.buffer, vertexBuffer.bufferMemory);
 
     Buffer::copyBuffer(stagingBuffer, vertexBuffer.buffer, deviceSize);
 
@@ -242,4 +242,84 @@ void App::clean()
     // vkDestroyInstance(instance, nullptr);
     glfwDestroyWindow(window.win);
     glfwTerminate();
+}
+
+void App::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height)
+{
+    VkCommandBuffer commandBuffer = RenderPipeline::beginSingleTimeCommands();
+    VkBufferImageCopy region{};
+    region.bufferOffset = 0;
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
+
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = 1;
+
+    region.imageOffset = {0, 0, 0};
+    region.imageExtent = {
+        width,
+        height,
+        1};
+    vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+    RenderPipeline::endSingleTimeCommands(commandBuffer);
+}
+
+void App::run()
+{
+    init();
+    loop();
+    clean();
+}
+
+void App::init()
+{
+    window.init();
+    std::cout << "instance creation\n";
+    instance.init();
+    // init_window();
+
+    /* Surface*/
+    instance.createSurface();
+
+    /* device selection and creation */
+    instance.pickPhysicalDevice();
+    instance.makeLogicalDevice();
+
+    std::cout << "swapchain creation\n";
+    /* SwapChain */
+    swapchain.makeSwapchain();
+
+    /* pipeline */
+    std::cout << "renderpipeline creation\n";
+    renderpipeline.makeRenderPass(depth);
+    renderpipeline.makeDescriptorSetLayout();
+    renderpipeline.makePipeline();
+    renderpipeline.makeCommandPool();
+    std::cout << "depth resource\n";
+    makeDepthResources();
+    std::cout << "frame buffer\n";
+    renderpipeline.makeFrameBuffer(depth);
+    std::cout << "texture image\n";
+    makeTextureImage();
+    texture.makeImageView(VK_IMAGE_ASPECT_COLOR_BIT);
+    texture.makeImageSampler();
+    std::cout << "cmdbuffer\n";
+    renderpipeline.makeCommandBuffer();
+
+    /* Vertex Buffer */
+    std::cout << "model creation\n";
+    model.loadModel();
+
+    std::cout << "buffer creation\n";
+    makeVertexBuffer();
+    makeIndexBuffer();
+    makeUniformBuffers();
+    renderpipeline.makeDescriptorPool();
+    renderpipeline.makeDescriptorSets(uniformBuffers, texture);
+
+    /* Sync */
+    std::cout << "sync creation\n";
+    syncobjects.makeSyncObjects();
 }

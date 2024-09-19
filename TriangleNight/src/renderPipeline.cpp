@@ -33,7 +33,7 @@ VkCommandBuffer RenderPipeline::beginSingleTimeCommands()
 	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 	allocInfo.commandBufferCount = 1;
-	allocInfo.commandPool = commandPool;
+	allocInfo.commandPool = RenderPipeline::commandPool;
 
 	VkCommandBuffer commandBuffer;
 	vkAllocateCommandBuffers(VulkanInstance::device, &allocInfo, &commandBuffer);
@@ -60,7 +60,7 @@ void RenderPipeline::endSingleTimeCommands(VkCommandBuffer buffer)
 	vkFreeCommandBuffers(VulkanInstance::device, commandPool, 1, &buffer);
 }
 
-void RenderPipeline::recordCommandBuffer(VkCommandBuffer buffer, uint32_t image, Buffer vertexBuffer, Buffer indexBuffer, Model model)
+void RenderPipeline::recordCommandBuffer(VkCommandBuffer buffer, uint32_t image, uint32_t currentFrame, Buffer vertexBuffer, Buffer indexBuffer, Model model)
 {
 	VkCommandBufferBeginInfo commandBufferBeginInfo{};
 	commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -106,7 +106,7 @@ void RenderPipeline::recordCommandBuffer(VkCommandBuffer buffer, uint32_t image,
 	vkCmdBindVertexBuffers(buffer, 0, 1, vertexBuffers, offsets);
 	vkCmdBindIndexBuffer(buffer, indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 
-	vkCmdBindDescriptorSets(buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[image], 0, nullptr);
+	vkCmdBindDescriptorSets(buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
 	vkCmdDrawIndexed(buffer, static_cast<uint32_t>(model.indices.size()), 1, 0, 0, 0);
 
 	vkCmdEndRenderPass(buffer);
