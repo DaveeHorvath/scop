@@ -1,4 +1,7 @@
 #include "syncobjects.hpp"
+#include "Vulkan.hpp"
+
+VkDevice VulkanInstance::device;
 
 void Syncobjects::makeSyncObjects()
 {
@@ -9,14 +12,14 @@ void Syncobjects::makeSyncObjects()
     semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
     for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
     {
-        if (vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &imageDoneSemaphores[i]) != VK_SUCCESS)
+        if (vkCreateSemaphore(VulkanInstance::device, &semaphoreCreateInfo, nullptr, &imageDoneSemaphores[i]) != VK_SUCCESS)
             throw std::runtime_error("Failed to create semaphore");
-        if (vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS)
+        if (vkCreateSemaphore(VulkanInstance::device, &semaphoreCreateInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS)
             throw std::runtime_error("Failed to create semaphore");
         VkFenceCreateInfo fenceCreateInfo{};
         fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
         fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-        if (vkCreateFence(device, &fenceCreateInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS)
+        if (vkCreateFence(VulkanInstance::device, &fenceCreateInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS)
             throw std::runtime_error("Failed to create fence");
     }
 }

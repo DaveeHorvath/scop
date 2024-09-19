@@ -1,11 +1,11 @@
 NAME=triangle
 CXX=c++
-LIBS=/home/dhorvath/.libs
+LIBS=/home/kali/.libs
 CXXFLAGS= -std=c++17 -Ofast -DDEBUG -g -I$(LIBS)/stb
 LDFLAGS = -lglfw -lvulkan -ldl -lpthread -lX11 -lXxf86vm -lXrandr -lXi
 
-SRC_FILE=main.cpp
 SRC_DIR =src/
+SRC_FILE=$(wildcard $(SRC_DIR)*.cpp)
 SRC=$(addprefix $(SRC_DIR), $(SRC_FILE))
 OBJ_DIR = obj/
 OBJ=$(addprefix $(OBJ_DIR), $(notdir $(SRC:.cpp=.o)))

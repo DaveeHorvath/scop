@@ -3,6 +3,11 @@
 #include <cstring>
 #include <set>
 #include "QueueFamilyIndicies.hpp"
+#include "renderPipeline.hpp"
+#include "window.hpp"
+
+VkQueue RenderPipeline::graphicsQueue;
+VkQueue RenderPipeline::presentQueue;
 
 bool VulkanInstance::check_validation_layer_support()
 {
@@ -131,12 +136,12 @@ void VulkanInstance::makeLogicalDevice()
     if (vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &device) != VK_SUCCESS)
         throw std::runtime_error("Failed to create logical device");
 
-    vkGetDeviceQueue(device, queues.graphicsFamily.value(), 0, &graphicsQueue);
-    vkGetDeviceQueue(device, queues.presentFamily.value(), 0, &presentQueue);
+    vkGetDeviceQueue(device, queues.graphicsFamily.value(), 0, &RenderPipeline::graphicsQueue);
+    vkGetDeviceQueue(device, queues.presentFamily.value(), 0, &RenderPipeline::presentQueue);
 }
 
 void VulkanInstance::createSurface()
 {
-    if (glfwCreateWindowSurface(instance, win, nullptr, &surface) != VK_SUCCESS)
+    if (glfwCreateWindowSurface(instance, Window::win, nullptr, &surface) != VK_SUCCESS)
         throw std::runtime_error("Failed to create surface");
 }

@@ -12,7 +12,7 @@ static void framebufferResizeCallback(GLFWwindow * win, int height, int width);
 class Window {
 public:
     void init();
-    GLFWwindow *win;
+    static GLFWwindow *win;
 };
 
 #endif

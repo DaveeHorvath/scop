@@ -1,6 +1,10 @@
 #include "buffer.hpp"
 #include <cstring>
 #include "renderPipeline.hpp"
+#include "Vulkan.hpp"
+
+VkPhysicalDevice VulkanInstance::physicalDevice;
+VkDevice VulkanInstance::device;
 
 void Buffer::makeBuffer(VkDeviceSize tmpsize, VkBufferUsageFlags usage, VkMemoryPropertyFlags props, VkBuffer &tmpbuffer, VkDeviceMemory &tmpbufferMemory)
 {
@@ -9,18 +13,18 @@ void Buffer::makeBuffer(VkDeviceSize tmpsize, VkBufferUsageFlags usage, VkMemory
     bufferCreateInfo.size = tmpsize;
     bufferCreateInfo.usage = usage;
     bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    if (vkCreateBuffer(device, &bufferCreateInfo, nullptr, &tmpbuffer) != VK_SUCCESS)
+    if (vkCreateBuffer(VulkanInstance::device, &bufferCreateInfo, nullptr, &tmpbuffer) != VK_SUCCESS)
         throw std::runtime_error("Failed to create buffer");
     VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(device, tmpbuffer, &memRequirements);
+    vkGetBufferMemoryRequirements(VulkanInstance::device, tmpbuffer, &memRequirements);
     VkMemoryAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, props, physicalDevice);
+    allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, props, VulkanInstance::physicalDevice);
 
-    if (vkAllocateMemory(device, &allocInfo, nullptr, &tmpbufferMemory) != VK_SUCCESS)
+    if (vkAllocateMemory(VulkanInstance::device, &allocInfo, nullptr, &tmpbufferMemory) != VK_SUCCESS)
         throw std::runtime_error("Failed to allocate memory");
-    vkBindBufferMemory(device, buffer, tmpbufferMemory, 0);
+    vkBindBufferMemory(VulkanInstance::device, tmpbuffer, tmpbufferMemory, 0);
 }
 
 void Buffer::init(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags props)
@@ -33,23 +37,23 @@ void Buffer::init(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyF
     makeBuffer(size, usage, props | VK_BUFFER_USAGE_TRANSFER_DST_BIT, buffer, bufferMemory);
 
     void *data;
-    vkMapMemory(device, stagingBufferMemory, 0, size, 0, &data);
+    vkMapMemory(VulkanInstance::device, stagingBufferMemory, 0, size, 0, &data);
     memcpy(data, data, (size_t)size);
-    vkUnmapMemory(device, stagingBufferMemory);
+    vkUnmapMemory(VulkanInstance::device, stagingBufferMemory);
 
     copyBuffer(stagingBuffer, buffer, size);
 
-    vkDestroyBuffer(device, stagingBuffer, nullptr);
-    vkFreeMemory(device, stagingBufferMemory, nullptr);
+    vkDestroyBuffer(VulkanInstance::device, stagingBuffer, nullptr);
+    vkFreeMemory(VulkanInstance::device, stagingBufferMemory, nullptr);
 }
 
 void Buffer::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
 {
-    VkCommandBuffer cmdBuffer = renderer.beginSingleTimeCommands();
+    VkCommandBuffer cmdBuffer = RenderPipeline::beginSingleTimeCommands();
 
     VkBufferCopy copyRegion{};
     copyRegion.size = size;
     vkCmdCopyBuffer(cmdBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
 
-    renderer.endSingleTimeCommands(cmdBuffer);
+    RenderPipeline::endSingleTimeCommands(cmdBuffer);
 }

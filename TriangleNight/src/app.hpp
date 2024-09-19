@@ -8,6 +8,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <stdexcept>
+
 static uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags props, VkPhysicalDevice physicalDevice)
 {
     VkPhysicalDeviceMemoryProperties memProps;
@@ -45,12 +47,12 @@ class App {
             clean();
         }
     private:
-        VulkanInstance instance{renderpipeline.graphicsQueue, renderpipeline.presentQueue, window.win};
+        VulkanInstance instance;
         // VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
         // VkDevice device = VK_NULL_HANDLE;
         // VkSurfaceKHR surface;
 
-        Swapchain swapchain{instance.physicalDevice, instance.device, instance.surface, window.win};
+        Swapchain swapchain;
         // VkSwapchainKHR swapchain;
 
         RenderPipeline renderpipeline;
@@ -71,36 +73,35 @@ class App {
         // std::vector<VkDescriptorSet> descriptorSets;
 
         /* Sync objects */
-        Syncobjects syncobjects{instance.device};
+        Syncobjects syncobjects;
         // std::vector<VkSemaphore> imageDoneSemaphores;
         // std::vector<VkSemaphore> renderFinishedSemaphores;
         // std::vector<VkFence> inFlightFences;
 
         /* should be a class*/
-        Buffer vertexBuffer{instance.device, instance.physicalDevice, renderpipeline};
+        Buffer vertexBuffer;
         // VkBuffer vertexBuffer;
         // VkDeviceMemory vertexBufferMemory;
         /* end of class */
 
-        Buffer indexBuffer{instance.device, instance.physicalDevice, renderpipeline};
+        Buffer indexBuffer;
         // VkBuffer indexBuffer;
         // VkDeviceMemory indexBufferMemory;
 
         std::vector<Buffer> uniformBuffers;
+        std::vector<void *> uniformBuffersMapped;
         // std::vector<VkBuffer> uniformBuffers;
         // std::vector<VkDeviceMemory> uniformBuffersMemory;
         // std::vector<void *> uniformBuffersMapped;
 
 
-        Image texture{VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-            instance.device, instance.physicalDevice};
+        Image texture{VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT};
         // VkImage textureImage;
         // VkDeviceMemory textureImageMemory;
         // VkImageView textureImageView;
         // VkSampler textureSampler;
 
-        Image depth{VK_FORMAT_UNDEFINED, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-            instance.device, instance.physicalDevice};
+        Image depth{VK_FORMAT_UNDEFINED, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT};
         // VkImage depthImage;
         // VkDeviceMemory depthImageMemory;
         // VkImageView depthImageView;
@@ -156,12 +157,12 @@ class App {
             swapchain.makeSwapchain();
 
             /* pipeline */
-            renderpipeline.makeRenderPass();
+            renderpipeline.makeRenderPass(depth);
             renderpipeline.makeDescriptorSetLayout();
             renderpipeline.makePipeline();
             renderpipeline.makeCommandPool();
             makeDepthResources();
-            renderpipeline.makeFrameBuffer();
+            renderpipeline.makeFrameBuffer(depth);
             makeTextureImage();
             // makeTextureImageView();
             // makeTextureSampler();
@@ -174,7 +175,7 @@ class App {
             makeIndexBuffer();
             makeUniformBuffers();
             renderpipeline.makeDescriptorPool();
-            renderpipeline.makeDescriptorSets();
+            renderpipeline.makeDescriptorSets(uniformBuffers, texture);
 
             /* Sync */
             syncobjects.makeSyncObjects();

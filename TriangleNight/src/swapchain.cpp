@@ -1,5 +1,15 @@
 #include "swapchain.hpp"
 #include "QueueFamilyIndicies.hpp"
+#include "Vulkan.hpp"
+#include "window.hpp"
+
+VkSurfaceFormatKHR pickSurfaceFormat(const std::vector<VkSurfaceFormatKHR> formats);
+VkPresentModeKHR pickSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
+VkExtent2D pickSwapChainExtent(const VkSurfaceCapabilitiesKHR& capabilities);
+
+VkSurfaceKHR VulkanInstance::surface;
+VkDevice VulkanInstance::device;
+VkPhysicalDevice VulkanInstance::physicalDevice;
 
 void Swapchain::makeSwapchain()
 {
@@ -10,7 +20,7 @@ void Swapchain::makeSwapchain()
     VkSurfaceFormatKHR surfaceFormat = pickSurfaceFormat(details.formats);
     VkSwapchainCreateInfoKHR swapchainCreateInfo{};
     swapchainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    swapchainCreateInfo.surface = surface;
+    swapchainCreateInfo.surface = VulkanInstance::surface;
     swapchainCreateInfo.minImageCount = imageCount;
     swapchainImageFormat = surfaceFormat.format;
     swapchainCreateInfo.imageFormat = swapchainImageFormat;
@@ -20,7 +30,7 @@ void Swapchain::makeSwapchain()
     swapchainCreateInfo.imageArrayLayers = 1;
     swapchainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     swapchainCreateInfo.presentMode = pickSwapPresentMode(details.modes);
-    QueueFamilyIndicies indicies = QueueFamilyIndicies::findQueueFamilyIndicies(physicalDevice, surface);
+    QueueFamilyIndicies indicies = QueueFamilyIndicies::findQueueFamilyIndicies(VulkanInstance::physicalDevice, VulkanInstance::surface);
     uint32_t queueFamilyIndices[] = {indicies.graphicsFamily.value(), indicies.presentFamily.value()};
     if (indicies.graphicsFamily != indicies.presentFamily) 
     {
@@ -34,13 +44,13 @@ void Swapchain::makeSwapchain()
     swapchainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
     swapchainCreateInfo.clipped = VK_TRUE;
     swapchainCreateInfo.oldSwapchain = nullptr;
-    if (vkCreateSwapchainKHR(device, &swapchainCreateInfo, nullptr, &swapchain) != VK_SUCCESS)
+    if (vkCreateSwapchainKHR(VulkanInstance::device, &swapchainCreateInfo, nullptr, &swapchain) != VK_SUCCESS)
         throw std::runtime_error("Failed to create swapchain");
 
     /* Make swapchain images */
-    vkGetSwapchainImagesKHR(device, swapchain, &swapchainImageCount, nullptr);
+    vkGetSwapchainImagesKHR(VulkanInstance::device, swapchain, &swapchainImageCount, nullptr);
     swapchainImages.resize(swapchainImageCount);
-    vkGetSwapchainImagesKHR(device, swapchain, &swapchainImageCount, swapchainImages.data());
+    vkGetSwapchainImagesKHR(VulkanInstance::device, swapchain, &swapchainImageCount, swapchainImages.data());
     /* Make swapchain image views */
     swapchainImagesViews.resize(swapchainImages.size());
     for (int i = 0; i < swapchainImages.size(); i++)
@@ -52,10 +62,10 @@ void Swapchain::remakeSwapchain()
     int width = 0, height = 0;
     while (width == 0 || height == 0)
     {
-        glfwGetFramebufferSize(win, &width, &height);
+        glfwGetFramebufferSize(Window::win, &width, &height);
         glfwWaitEvents();
     }
-    vkDeviceWaitIdle(device);
+    vkDeviceWaitIdle(VulkanInstance::device);
     cleanupSwapChain();
     makeSwapchain();
     // makeDepthResources();
@@ -94,29 +104,29 @@ void Swapchain::cleanupSwapChain()
     // vkDestroyImage(device, depthImage, nullptr);
     // vkFreeMemory(device, depthImageMemory, nullptr);
     for (auto& imview : swapchainImagesViews)
-        vkDestroyImageView(device, imview, nullptr);
+        vkDestroyImageView(VulkanInstance::device, imview, nullptr);
     // for (auto& framebuf : swapchainFramebuffers)
     //     vkDestroyFramebuffer(device, framebuf, nullptr);
-    vkDestroySwapchainKHR(device, swapchain, nullptr);
+    vkDestroySwapchainKHR(VulkanInstance::device, swapchain, nullptr);
 }
 
 SwapChainSupportDetails Swapchain::findSwapChainSupportDetails()
 {
     SwapChainSupportDetails details;
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &details.capabilities);
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(VulkanInstance::physicalDevice, VulkanInstance::surface, &details.capabilities);
     uint32_t formatCount = 0;
-    vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, nullptr);
+    vkGetPhysicalDeviceSurfaceFormatsKHR(VulkanInstance::physicalDevice, VulkanInstance::surface, &formatCount, nullptr);
     if (formatCount)
     {
         details.formats.resize(formatCount);
-        vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, details.formats.data());
+        vkGetPhysicalDeviceSurfaceFormatsKHR(VulkanInstance::physicalDevice, VulkanInstance::surface, &formatCount, details.formats.data());
     }
     uint32_t modesCount = 0;
-    vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &modesCount, nullptr);
+    vkGetPhysicalDeviceSurfacePresentModesKHR(VulkanInstance::physicalDevice, VulkanInstance::surface, &modesCount, nullptr);
     if (modesCount)
     {
         details.modes.resize(modesCount);
-        vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &modesCount, details.modes.data());
+        vkGetPhysicalDeviceSurfacePresentModesKHR(VulkanInstance::physicalDevice, VulkanInstance::surface, &modesCount, details.modes.data());
     }
     return details;
 }

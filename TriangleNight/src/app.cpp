@@ -1,4 +1,13 @@
 #include "app.hpp"
+#include <chrono>
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+#include <iostream>
+#include <stdexcept>
+
+VkDevice VulkanInstance::device;
+VkPhysicalDevice VulkanInstance::physicalDevice;
+VkExtent2D Swapchain::swapchainExtent;
 
 void App::updateUniformBuffer(uint32_t currentImage)
 {
@@ -10,20 +19,20 @@ void App::updateUniformBuffer(uint32_t currentImage)
     UniformBufferObject ubo{};
     ubo.model = glm::rotate(glm::mat4(1.0f), deltatime * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     ubo.view = glm::lookAt(glm::vec3(5.0f, 5.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f));
-    ubo.proj = glm::perspective(glm::radians(90.0f), swapchainExtent.width / (float)swapchainExtent.height, 0.1f, 30.0f);
+    ubo.proj = glm::perspective(glm::radians(90.0f), Swapchain::swapchainExtent.width / (float)Swapchain::swapchainExtent.height, 0.1f, 30.0f);
     // ubo.proj[1][1] *= -1;
     memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
 }
 
 void App::drawFrame()
 {
-    vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
+    vkWaitForFences(instance.device, 1, &syncobjects.inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
     uint32_t image;
-    VkResult res = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, imageDoneSemaphores[currentFrame], VK_NULL_HANDLE, &image);
+    VkResult res = vkAcquireNextImageKHR(instance.device, swapchain.swapchain, UINT64_MAX, syncobjects.imageDoneSemaphores[currentFrame], VK_NULL_HANDLE, &image);
 
     if (res == VK_ERROR_OUT_OF_DATE_KHR)
     {
-        remakeSwapChain();
+        swapchain.remakeSwapchain();
         return;
     }
     else if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
@@ -31,40 +40,40 @@ void App::drawFrame()
 
     updateUniformBuffer(currentFrame);
 
-    vkResetFences(device, 1, &inFlightFences[currentFrame]);
+    vkResetFences(instance.device, 1, &syncobjects.inFlightFences[currentFrame]);
 
-    vkResetCommandBuffer(commandBuffers[currentFrame], 0);
-    recordCommandBuffer(commandBuffers[currentFrame], image);
+    vkResetCommandBuffer(renderpipeline.commandBuffers[currentFrame], 0);
+    renderpipeline.recordCommandBuffer(renderpipeline.commandBuffers[currentFrame], image, vertexBuffer, indexBuffer, model);
 
     VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
 
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffers[currentFrame];
+    submitInfo.pCommandBuffers = &renderpipeline.commandBuffers[currentFrame];
     submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = &renderFinishedSemaphores[currentFrame];
+    submitInfo.pSignalSemaphores = &syncobjects.renderFinishedSemaphores[currentFrame];
     submitInfo.waitSemaphoreCount = 1;
-    submitInfo.pWaitSemaphores = &imageDoneSemaphores[currentFrame];
+    submitInfo.pWaitSemaphores = &syncobjects.imageDoneSemaphores[currentFrame];
     submitInfo.pWaitDstStageMask = waitStages;
 
-    if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS)
+    if (vkQueueSubmit(renderpipeline.graphicsQueue, 1, &submitInfo, syncobjects.inFlightFences[currentFrame]) != VK_SUCCESS)
         throw std::runtime_error("Failed to submit to queue");
 
     VkPresentInfoKHR presentInfo{};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     presentInfo.swapchainCount = 1;
-    presentInfo.pSwapchains = &swapchain;
+    presentInfo.pSwapchains = &swapchain.swapchain;
     presentInfo.pImageIndices = &image;
     presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = &renderFinishedSemaphores[currentFrame];
+    presentInfo.pWaitSemaphores = &syncobjects.renderFinishedSemaphores[currentFrame];
 
-    res = vkQueuePresentKHR(graphicsQueue, &presentInfo);
+    res = vkQueuePresentKHR(renderpipeline.graphicsQueue, &presentInfo);
 
     if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR || frameResize)
     {
         frameResize = false;
-        remakeSwapChain();
+        swapchain.remakeSwapchain();
         return;
     }
     else if (res != VK_SUCCESS)
@@ -73,50 +82,52 @@ void App::drawFrame()
     currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
+// fix this
 void App::makeIndexBuffer()
 {
-    VkDeviceSize deviceSize = sizeof(indices[0]) * indices.size();
+    VkDeviceSize deviceSize = sizeof(model.indices[0]) * model.indices.size();
 
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
 
-    makeBuffer(deviceSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+    Buffer::makeBuffer(deviceSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
     void *data;
-    vkMapMemory(device, stagingBufferMemory, 0, deviceSize, 0, &data);
-    memcpy(data, indices.data(), (size_t)deviceSize);
-    vkUnmapMemory(device, stagingBufferMemory);
+    vkMapMemory(instance.device, stagingBufferMemory, 0, deviceSize, 0, &data);
+    memcpy(data, model.indices.data(), (size_t)deviceSize);
+    vkUnmapMemory(instance.device, stagingBufferMemory);
 
-    makeBuffer(deviceSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-               VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
+    Buffer::makeBuffer(deviceSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer.buffer, indexBuffer.bufferMemory);
 
-    copyBuffer(stagingBuffer, indexBuffer, deviceSize);
+    Buffer::copyBuffer(stagingBuffer, indexBuffer.buffer, deviceSize);
 
-    vkDestroyBuffer(device, stagingBuffer, nullptr);
-    vkFreeMemory(device, stagingBufferMemory, nullptr);
+    vkDestroyBuffer(instance.device, stagingBuffer, nullptr);
+    vkFreeMemory(instance.device, stagingBufferMemory, nullptr);
 }
 
+// fix this
 void App::makeVertexBuffer()
 {
-    VkDeviceSize deviceSize = sizeof(vertices[0]) * vertices.size();
+    VkDeviceSize deviceSize = sizeof(model.vertices[0]) * model.vertices.size();
 
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
 
-    makeBuffer(deviceSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+    Buffer::makeBuffer(deviceSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
     void *data;
-    vkMapMemory(device, stagingBufferMemory, 0, deviceSize, 0, &data);
-    memcpy(data, vertices.data(), (size_t)deviceSize);
-    vkUnmapMemory(device, stagingBufferMemory);
+    vkMapMemory(instance.device, stagingBufferMemory, 0, deviceSize, 0, &data);
+    memcpy(data, model.vertices.data(), (size_t)deviceSize);
+    vkUnmapMemory(instance.device, stagingBufferMemory);
 
-    makeBuffer(deviceSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-               VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
+    Buffer::makeBuffer(deviceSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer.buffer, vertexBuffer.bufferMemory);
 
-    copyBuffer(stagingBuffer, vertexBuffer, deviceSize);
+    Buffer::copyBuffer(stagingBuffer, vertexBuffer.buffer, deviceSize);
 
-    vkDestroyBuffer(device, stagingBuffer, nullptr);
-    vkFreeMemory(device, stagingBufferMemory, nullptr);
+    vkDestroyBuffer(instance.device, stagingBuffer, nullptr);
+    vkFreeMemory(instance.device, stagingBufferMemory, nullptr);
 }
 
 void App::makeUniformBuffers()
@@ -124,16 +135,16 @@ void App::makeUniformBuffers()
     VkDeviceSize bufferSize = sizeof(UniformBufferObject);
 
     uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
-    uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
     uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
 
     for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
     {
-        makeBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
-        vkMapMemory(device, uniformBuffersMemory[i], 0, bufferSize, 0, &uniformBuffersMapped[i]);
+        Buffer::makeBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i].buffer, uniformBuffers[i].bufferMemory);
+        vkMapMemory(instance.device, uniformBuffers[i].bufferMemory, 0, bufferSize, 0, &uniformBuffersMapped[i]);
     }
 }
 
+// fix this
 void App::makeTextureImage()
 {
     int texWidth, texHeight, texChannels;
@@ -146,99 +157,94 @@ void App::makeTextureImage()
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
 
-    makeBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+    Buffer::makeBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
     void *data;
-    vkMapMemory(device, stagingBufferMemory, 0, imageSize, 0, &data);
+    vkMapMemory(VulkanInstance::device, stagingBufferMemory, 0, imageSize, 0, &data);
     memcpy(data, pixels, imageSize);
-    vkUnmapMemory(device, stagingBufferMemory);
+    vkUnmapMemory(VulkanInstance::device, stagingBufferMemory);
 
     stbi_image_free(pixels);
 
-    makeImage(texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-              VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureImageMemory);
+    texture.makeImage(texWidth, texHeight, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
 
-    transitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL); // specify correct layout for transfers
-    copyBufferToImage(stagingBuffer, textureImage, texWidth, texHeight);
-    transitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL); // specify correct layout for shaders
+    texture.transitionImageLayout(renderpipeline, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL); // specify correct layout for transfers
+    copyBufferToImage(stagingBuffer, texture.image, texWidth, texHeight);
+    texture.transitionImageLayout(renderpipeline, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL); // specify correct layout for shaders
 
-    vkDestroyBuffer(device, stagingBuffer, nullptr);
-    vkFreeMemory(device, stagingBufferMemory, nullptr);
+    vkDestroyBuffer(VulkanInstance::device, stagingBuffer, nullptr);
+    vkFreeMemory(VulkanInstance::device, stagingBufferMemory, nullptr);
 }
 
+// fix this
 void App::makeDepthResources()
 {
-    VkFormat depthFormat = findSupportedFormat({VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT}, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
-    makeImage(swapchainExtent.width, swapchainExtent.height, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage, depthImageMemory);
-    depthImageView = makeImageView(depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
-}
-
-static void framebufferResizeCallback(GLFWwindow *win, int height, int width)
-{
-    auto app = reinterpret_cast<App *>(glfwGetWindowUserPointer(win));
-    app->frameResize = true;
+    VkFormat depthFormat = depth.findSupportedFormat({VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT}, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+    depth.makeImage(swapchain.swapchainExtent.width, swapchain.swapchainExtent.height, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+    depth.makeImageView();
 }
 
 void App::loop()
 {
     std::cout << "=====  LOOP'O CLOCK  =====\n";
-    while (!glfwWindowShouldClose(win))
+    while (!glfwWindowShouldClose(Window::win))
     {
         glfwPollEvents();
         drawFrame();
     }
     std::cout << "=====  WAIT FOR CLEAN  =====\n";
-    vkDeviceWaitIdle(device);
+    vkDeviceWaitIdle(VulkanInstance::device);
 }
 
+// needs refactor
 void App::clean()
 {
     std::cout << "=====  CLEANUP  =====\n";
 
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-    {
-        vkDestroyBuffer(device, uniformBuffers[i], nullptr);
-        vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
-    }
+    // for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+    // {
+    //     vkDestroyBuffer(VulkanInstance::device, uniformBuffers[i], nullptr);
+    //     vkFreeMemory(VulkanInstance::device, uniformBuffersMemory[i], nullptr);
+    // }
 
-    vkDestroyImageView(device, depthImageView, nullptr);
-    vkDestroyImage(device, depthImage, nullptr);
-    vkFreeMemory(device, depthImageMemory, nullptr);
+    // vkDestroyImageView(VulkanInstance::device, depthImageView, nullptr);
+    // vkDestroyImage(VulkanInstance::device, depthImage, nullptr);
+    // vkFreeMemory(VulkanInstance::device, depthImageMemory, nullptr);
 
-    vkDestroySampler(device, textureSampler, nullptr);
+    // vkDestroySampler(VulkanInstance::device, textureSampler, nullptr);
 
-    vkDestroyImageView(device, textureImageView, nullptr);
+    // vkDestroyImageView(VulkanInstance::device, textureImageView, nullptr);
 
-    vkDestroyImage(device, textureImage, nullptr);
-    vkFreeMemory(device, textureImageMemory, nullptr);
+    // vkDestroyImage(VulkanInstance::device, textureImage, nullptr);
+    // vkFreeMemory(VulkanInstance::device, textureImageMemory, nullptr);
 
-    vkDestroyDescriptorPool(device, descriptorPool, nullptr);
-    vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+    // vkDestroyDescriptorPool(VulkanInstance::device, descriptorPool, nullptr);
+    // vkDestroyDescriptorSetLayout(VulkanInstance::device, descriptorSetLayout, nullptr);
 
-    vkDestroyBuffer(device, vertexBuffer, nullptr);
-    vkFreeMemory(device, vertexBufferMemory, nullptr);
+    // vkDestroyBuffer(VulkanInstance::device, vertexBuffer, nullptr);
+    // vkFreeMemory(VulkanInstance::device, vertexBufferMemory, nullptr);
 
-    vkDestroyBuffer(device, indexBuffer, nullptr);
-    vkFreeMemory(device, indexBufferMemory, nullptr);
+    // vkDestroyBuffer(VulkanInstance::device, indexBuffer, nullptr);
+    // vkFreeMemory(VulkanInstance::device, indexBufferMemory, nullptr);
 
-    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-    {
-        vkDestroyFence(device, inFlightFences[i], nullptr);
-        vkDestroySemaphore(device, imageDoneSemaphores[i], nullptr);
-        vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
-    }
+    // for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+    // {
+    //     vkDestroyFence(VulkanInstance::device, inFlightFences[i], nullptr);
+    //     vkDestroySemaphore(VulkanInstance::device, imageDoneSemaphores[i], nullptr);
+    //     vkDestroySemaphore(VulkanInstance::device, renderFinishedSemaphores[i], nullptr);
+    // }
 
-    vkDestroyCommandPool(device, commandPool, nullptr);
-    for (auto &buffer : swapchainFramebuffers)
-        vkDestroyFramebuffer(device, buffer, nullptr);
-    vkDestroyPipeline(device, graphicsPipeline, nullptr);
-    vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-    vkDestroyRenderPass(device, renderPass, nullptr);
-    for (auto &imageView : swapchainImagesViews)
-        vkDestroyImageView(device, imageView, nullptr);
-    vkDestroySwapchainKHR(device, swapchain, nullptr);
-    vkDestroyDevice(device, nullptr);
-    vkDestroySurfaceKHR(instance, surface, nullptr);
-    vkDestroyInstance(instance, nullptr);
-    glfwDestroyWindow(win);
+    // vkDestroyCommandPool(VulkanInstance::device, commandPool, nullptr);
+    // for (auto &buffer : swapchainFramebuffers)
+    //     vkDestroyFramebuffer(VulkanInstance::device, buffer, nullptr);
+    // vkDestroyPipeline(VulkanInstance::device, graphicsPipeline, nullptr);
+    // vkDestroyPipelineLayout(VulkanInstance::device, pipelineLayout, nullptr);
+    // vkDestroyRenderPass(VulkanInstance::device, renderPass, nullptr);
+    // for (auto &imageView : swapchainImagesViews)
+    //     vkDestroyImageView(VulkanInstance::device, imageView, nullptr);
+    // vkDestroySwapchainKHR(VulkanInstance::device, swapchain, nullptr);
+    // vkDestroyDevice(VulkanInstance::device, nullptr);
+    // vkDestroySurfaceKHR(instance, surface, nullptr);
+    // vkDestroyInstance(instance, nullptr);
+    glfwDestroyWindow(window.win);
     glfwTerminate();
 }

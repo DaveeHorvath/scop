@@ -6,6 +6,14 @@
 #include "UniformBufferObject.hpp"
 #include "Model.hpp"
 #include "buffer.hpp"
+#include "Vulkan.hpp"
+#include "swapchain.hpp"
+#include "image.hpp"
+
+VkDevice VulkanInstance::device;
+VkPhysicalDevice VulkanInstance::physicalDevice;
+VkExtent2D Swapchain::swapchainExtent;
+VkFormat Swapchain::swapchainImageFormat;
 
 static std::vector<char> readShader(const std::string &filename)
 {
@@ -32,7 +40,7 @@ VkCommandBuffer RenderPipeline::beginSingleTimeCommands()
 	allocInfo.commandPool = commandPool;
 
 	VkCommandBuffer commandBuffer;
-	vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer);
+	vkAllocateCommandBuffers(VulkanInstance::device, &allocInfo, &commandBuffer);
 
 	VkCommandBufferBeginInfo beginInfo{};
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -53,10 +61,10 @@ void RenderPipeline::endSingleTimeCommands(VkCommandBuffer buffer)
 	vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
 	vkQueueWaitIdle(graphicsQueue);
 
-	vkFreeCommandBuffers(device, commandPool, 1, &buffer);
+	vkFreeCommandBuffers(VulkanInstance::device, commandPool, 1, &buffer);
 }
 
-void RenderPipeline::recordCommandBuffer(VkCommandBuffer buffer, uint32_t image, uint32_t currentFrame)
+void RenderPipeline::recordCommandBuffer(VkCommandBuffer buffer, uint32_t image, Buffer vertexBuffer, Buffer indexBuffer, Model model)
 {
 	VkCommandBufferBeginInfo commandBufferBeginInfo{};
 	commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -70,7 +78,7 @@ void RenderPipeline::recordCommandBuffer(VkCommandBuffer buffer, uint32_t image,
 	renderPassBeginInfo.framebuffer = swapchainFramebuffers[image];
 
 	renderPassBeginInfo.renderArea.offset = {0, 0};
-	renderPassBeginInfo.renderArea.extent = swapchainExtent;
+	renderPassBeginInfo.renderArea.extent = Swapchain::swapchainExtent;
 
 	std::array<VkClearValue, 2> clearValues{};
 	clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
@@ -86,15 +94,15 @@ void RenderPipeline::recordCommandBuffer(VkCommandBuffer buffer, uint32_t image,
 	VkViewport viewport{};
 	viewport.x = 0.0f;
 	viewport.y = 0.0f;
-	viewport.width = (float)swapchainExtent.width;
-	viewport.height = (float)swapchainExtent.height;
+	viewport.width = (float)Swapchain::swapchainExtent.width;
+	viewport.height = (float)Swapchain::swapchainExtent.height;
 	viewport.minDepth = 0.0f;
 	viewport.maxDepth = 1.0f;
 	vkCmdSetViewport(buffer, 0, 1, &viewport);
 
 	VkRect2D scissor{};
 	scissor.offset = {0, 0};
-	scissor.extent = swapchainExtent;
+	scissor.extent = Swapchain::swapchainExtent;
 	vkCmdSetScissor(buffer, 0, 1, &scissor);
 
 	VkBuffer vertexBuffers[] = {vertexBuffer.buffer};
@@ -102,7 +110,7 @@ void RenderPipeline::recordCommandBuffer(VkCommandBuffer buffer, uint32_t image,
 	vkCmdBindVertexBuffers(buffer, 0, 1, vertexBuffers, offsets);
 	vkCmdBindIndexBuffer(buffer, indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 
-	vkCmdBindDescriptorSets(buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
+	vkCmdBindDescriptorSets(buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[image], 0, nullptr);
 	vkCmdDrawIndexed(buffer, static_cast<uint32_t>(model.indices.size()), 1, 0, 0, 0);
 
 	vkCmdEndRenderPass(buffer);
@@ -112,13 +120,13 @@ void RenderPipeline::recordCommandBuffer(VkCommandBuffer buffer, uint32_t image,
 
 void RenderPipeline::makeCommandPool()
 {
-	QueueFamilyIndicies indicies = QueueFamilyIndicies::findQueueFamilyIndicies(physicalDevice, surface);
+	QueueFamilyIndicies indicies = QueueFamilyIndicies::findQueueFamilyIndicies(VulkanInstance::physicalDevice, VulkanInstance::surface);
 	VkCommandPoolCreateInfo commandPoolCreateInfo{};
 	commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 	commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 	commandPoolCreateInfo.queueFamilyIndex = indicies.graphicsFamily.value();
 
-	if (vkCreateCommandPool(device, &commandPoolCreateInfo, nullptr, &commandPool) != VK_SUCCESS)
+	if (vkCreateCommandPool(VulkanInstance::device, &commandPoolCreateInfo, nullptr, &commandPool) != VK_SUCCESS)
 		throw std::runtime_error("Failed to create command pool");
 }
 
@@ -130,7 +138,7 @@ void RenderPipeline::makeCommandBuffer()
 	commandBufferAllocateInfo.commandBufferCount = commandBuffers.size();
 	commandBufferAllocateInfo.commandPool = commandPool;
 	commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	if (vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, commandBuffers.data()) != VK_SUCCESS)
+	if (vkAllocateCommandBuffers(VulkanInstance::device, &commandBufferAllocateInfo, commandBuffers.data()) != VK_SUCCESS)
 		throw std::runtime_error("Failed to allocate command buffer");
 }
 
@@ -158,11 +166,11 @@ void RenderPipeline::makeDescriptorSetLayout()
 	layoutInfo.bindingCount = bindings.size();
 	layoutInfo.pBindings = bindings.data();
 
-	if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS)
+	if (vkCreateDescriptorSetLayout(VulkanInstance::device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS)
 		throw std::runtime_error("Failed to create descriptor set layout");
 }
 
-void RenderPipeline::makeDescriptorSets()
+void RenderPipeline::makeDescriptorSets(std::vector<Buffer> uniformBuffers, Image textureImage)
 {
 	std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
 
@@ -173,7 +181,7 @@ void RenderPipeline::makeDescriptorSets()
 	allocInfo.pSetLayouts = layouts.data();
 
 	descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
-	if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) != VK_SUCCESS)
+	if (vkAllocateDescriptorSets(VulkanInstance::device, &allocInfo, descriptorSets.data()) != VK_SUCCESS)
 		throw std::runtime_error("Failed to create descriptor set");
 
 	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
@@ -185,8 +193,8 @@ void RenderPipeline::makeDescriptorSets()
 
 		VkDescriptorImageInfo imageInfo{};
 		imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		imageInfo.imageView = textureImage.textureImageView;
-		imageInfo.sampler = textureImage.textureSampler;
+		imageInfo.imageView = textureImage.imageView;
+		imageInfo.sampler = textureImage.sampler;
 
 		std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
 		descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -205,7 +213,7 @@ void RenderPipeline::makeDescriptorSets()
 		descriptorWrites[1].descriptorCount = 1;
 		descriptorWrites[1].pImageInfo = &imageInfo;
 
-		vkUpdateDescriptorSets(device, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
+		vkUpdateDescriptorSets(VulkanInstance::device, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
 	}
 }
 
@@ -223,14 +231,14 @@ void RenderPipeline::makeDescriptorPool()
 	poolInfo.pPoolSizes = poolSizes.data();
 	poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
 
-	if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS)
+	if (vkCreateDescriptorPool(VulkanInstance::device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS)
 		throw std::runtime_error("Failed to create descriptor pool");
 }
 
-void RenderPipeline::makeRenderPass()
+void RenderPipeline::makeRenderPass(Image depthImage)
 {
 	VkAttachmentDescription attachmentDescription{};
-	attachmentDescription.format = swapchainImageFormat;
+	attachmentDescription.format = Swapchain::swapchainImageFormat;
 	attachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
 	attachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	attachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -283,7 +291,7 @@ void RenderPipeline::makeRenderPass()
 	renderPassCreateInfo.dependencyCount = 1;
 	renderPassCreateInfo.pDependencies = &subpassDependency;
 
-	if (vkCreateRenderPass(device, &renderPassCreateInfo, nullptr, &renderPass) != VK_SUCCESS)
+	if (vkCreateRenderPass(VulkanInstance::device, &renderPassCreateInfo, nullptr, &renderPass) != VK_SUCCESS)
 		throw std::runtime_error("Failed to create renderpass");
 }
 
@@ -327,14 +335,14 @@ void RenderPipeline::makePipeline()
 	VkViewport viewport{};
 	viewport.x = 0.0f;
 	viewport.y = 0.0f;
-	viewport.width = (float)swapchainExtent.width;
-	viewport.height = (float)swapchainExtent.height;
+	viewport.width = (float)Swapchain::swapchainExtent.width;
+	viewport.height = (float)Swapchain::swapchainExtent.height;
 	viewport.minDepth = 0.0f;
 	viewport.maxDepth = 1.0f;
 
 	VkRect2D scissor{};
 	scissor.offset = {0, 0};
-	scissor.extent = swapchainExtent;
+	scissor.extent = Swapchain::swapchainExtent;
 
 	VkPipelineViewportStateCreateInfo pipelineViewpoerStateCreateInfo{};
 	pipelineViewpoerStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -382,7 +390,7 @@ void RenderPipeline::makePipeline()
 	pipelineLayoutCreateInfo.setLayoutCount = 1;
 	pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayout;
 
-	if (vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout) != VK_SUCCESS)
+	if (vkCreatePipelineLayout(VulkanInstance::device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout) != VK_SUCCESS)
 		throw std::runtime_error("Failed to create pipeline layout");
 
 	VkPipelineDepthStencilStateCreateInfo depthStencil{};
@@ -415,21 +423,21 @@ void RenderPipeline::makePipeline()
 	graphicsPipelineCreateInfo.basePipelineIndex = -1;
 	graphicsPipelineCreateInfo.pDepthStencilState = &depthStencil;
 
-	if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &graphicsPipelineCreateInfo, nullptr, &graphicsPipeline) != VK_SUCCESS)
+	if (vkCreateGraphicsPipelines(VulkanInstance::device, VK_NULL_HANDLE, 1, &graphicsPipelineCreateInfo, nullptr, &graphicsPipeline) != VK_SUCCESS)
 		throw std::runtime_error("Failed to create pipeline");
 
-	vkDestroyShaderModule(device, vertexShaderModule, nullptr);
-	vkDestroyShaderModule(device, fragmentShaderModule, nullptr);
+	vkDestroyShaderModule(VulkanInstance::device, vertexShaderModule, nullptr);
+	vkDestroyShaderModule(VulkanInstance::device, fragmentShaderModule, nullptr);
 }
 
-void RenderPipeline::makeFrameBuffer()
+void RenderPipeline::makeFrameBuffer(Image depthImage)
 {
-	swapchainFramebuffers.resize(swapchain.swapchainImageCount);
+	swapchainFramebuffers.resize(Swapchain::swapchainImages.size());
 
-	for (int i = 0; i < swapchain.swapchainImageCount; i++)
+	for (int i = 0; i < Swapchain::swapchainImages.size(); i++)
 	{
 		std::array<VkImageView, 2> attachments = {
-			swapchain.swapchainImagesViews[i],
+			Swapchain::swapchainImagesViews[i],
 			depthImage.imageView};
 
 		VkFramebufferCreateInfo framebufferCreateInfo{};
@@ -437,24 +445,24 @@ void RenderPipeline::makeFrameBuffer()
 		framebufferCreateInfo.renderPass = renderPass;
 		framebufferCreateInfo.attachmentCount = attachments.size();
 		framebufferCreateInfo.pAttachments = attachments.data();
-		framebufferCreateInfo.height = swapchainExtent.height;
-		framebufferCreateInfo.width = swapchainExtent.width;
+		framebufferCreateInfo.height = Swapchain::swapchainExtent.height;
+		framebufferCreateInfo.width = Swapchain::swapchainExtent.width;
 		framebufferCreateInfo.layers = 1;
 
-		if (vkCreateFramebuffer(device, &framebufferCreateInfo, nullptr, &swapchainFramebuffers[i]) != VK_SUCCESS)
+		if (vkCreateFramebuffer(VulkanInstance::device, &framebufferCreateInfo, nullptr, &swapchainFramebuffers[i]) != VK_SUCCESS)
 			throw std::runtime_error("Failed to create framebuffers");
 	}
 }
 
- VkShaderModule RenderPipeline::makeShaderModule(const std::vector<char>& shader)
-        {
-            VkShaderModuleCreateInfo shaderModuleCreateInfo{};
-            shaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-            shaderModuleCreateInfo.codeSize = shader.size();
-            shaderModuleCreateInfo.pCode = reinterpret_cast<const uint32_t*>(shader.data());
+VkShaderModule RenderPipeline::makeShaderModule(const std::vector<char> &shader)
+{
+	VkShaderModuleCreateInfo shaderModuleCreateInfo{};
+	shaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	shaderModuleCreateInfo.codeSize = shader.size();
+	shaderModuleCreateInfo.pCode = reinterpret_cast<const uint32_t *>(shader.data());
 
-            VkShaderModule shaderModule;
-            if (vkCreateShaderModule(device, &shaderModuleCreateInfo, nullptr, &shaderModule) != VK_SUCCESS)
-                throw std::runtime_error("Failed to create shadermodule");
-            return shaderModule;
-        }
+	VkShaderModule shaderModule;
+	if (vkCreateShaderModule(VulkanInstance::device, &shaderModuleCreateInfo, nullptr, &shaderModule) != VK_SUCCESS)
+		throw std::runtime_error("Failed to create shadermodule");
+	return shaderModule;
+}

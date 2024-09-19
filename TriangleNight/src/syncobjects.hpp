@@ -10,12 +10,10 @@
 
 class Syncobjects {
 private:
-    VkDevice& device;
 public:
-    Syncobjects(VkDevice& _device) : device(_device) {};
-    std::vector<VkSemaphore> imageDoneSemaphores;
-    std::vector<VkSemaphore> renderFinishedSemaphores;
-    std::vector<VkFence> inFlightFences;
+    static std::vector<VkSemaphore> imageDoneSemaphores;
+    static std::vector<VkSemaphore> renderFinishedSemaphores;
+    static std::vector<VkFence> inFlightFences;
     void makeSyncObjects();
 };
 

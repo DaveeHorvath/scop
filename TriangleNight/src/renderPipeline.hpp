@@ -11,54 +11,44 @@
 #include <vector>
 
 class RenderObject;
+class Image;
+class Model;
+class Buffer;
 
 class RenderPipeline {
 private:
-    VkDevice& device;
-    VkPhysicalDevice& physicalDevice;
-    VkExtent2D& swapchainExtent;
-    Model& model;
-    Buffer& vertexBuffer;
-    Buffer& indexBuffer;
-    VkSurfaceKHR& surface;
-    std::vector<Buffer>& uniformBuffers;
-    Image& textureImage;
-    Image& depthImage;
-    VkFormat& swapchainImageFormat;
-    Swapchain& swapchain;
-
     VkShaderModule makeShaderModule(const std::vector<char>& shader);
 public:
     VkRenderPass renderPass;
     VkDescriptorSetLayout descriptorSetLayout;
     VkPipelineLayout pipelineLayout;
 
-    VkQueue graphicsQueue;
-    VkQueue presentQueue;
+    static VkQueue graphicsQueue;
+    static VkQueue presentQueue;
 
-    VkPipeline graphicsPipeline;
+    static VkPipeline graphicsPipeline;
     std::vector<VkFramebuffer> swapchainFramebuffers;
 
-    VkCommandPool commandPool;
+    static VkCommandPool commandPool;
     std::vector<VkCommandBuffer> commandBuffers;
 
-    VkDescriptorPool descriptorPool;
+    static VkDescriptorPool descriptorPool;
     std::vector<VkDescriptorSet> descriptorSets;
 
-    VkCommandBuffer beginSingleTimeCommands();
-    void endSingleTimeCommands(VkCommandBuffer buffer);
-    void recordCommandBuffer(VkCommandBuffer buffer, uint32_t image, uint32_t currenFrame);   
+    static VkCommandBuffer beginSingleTimeCommands();
+    static void endSingleTimeCommands(VkCommandBuffer buffer);
+    void recordCommandBuffer(VkCommandBuffer buffer, uint32_t image, Buffer vertexBuffer, Buffer indexBuffer, Model model);
 
     void makeCommandPool();
     void makeCommandBuffer();
 
-    void makeFrameBuffer();
+    void makeFrameBuffer(Image depthImage);
 
     void makeDescriptorSetLayout();
-    void makeDescriptorSets();
+    void makeDescriptorSets(std::vector<Buffer> uniformBuffers, Image textureImage);
     void makeDescriptorPool();
 
-    void makeRenderPass();
+    void makeRenderPass(Image depthImage);
     void makePipeline();
 };
 

@@ -1,6 +1,6 @@
 #include "window.hpp"
 #include <iostream>
-
+#include "app.hpp"
 void Window::init()
 {
     std::cout << "=====  Window init  =====\n";
@@ -10,4 +10,10 @@ void Window::init()
     win = glfwCreateWindow(WIDTH, HEIGHT, "FUNny", nullptr, nullptr);
     glfwSetWindowUserPointer(win, this);
     glfwSetFramebufferSizeCallback(win, framebufferResizeCallback);
+}
+
+static void framebufferResizeCallback(GLFWwindow *win, int height, int width)
+{
+    auto app = reinterpret_cast<App *>(glfwGetWindowUserPointer(win));
+    app->frameResize = true;
 }

@@ -14,20 +14,15 @@
 
 class VulkanInstance {
 private:
-    VkQueue& graphicsQueue;
-    VkQueue& presentQueue;
-    VkInstance instance;
-    
-    GLFWwindow *win;
-
     const std::vector<const char *> validationLayer {"VK_LAYER_KHRONOS_validation"};
     const std::vector<const char *> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+
+    VkInstance instance;
 public:
-    VkPhysicalDevice physicalDevice;
-    VkDevice device;
-    VkSurfaceKHR surface;
-    VulkanInstance(VkQueue& _graphicsQueue, VkQueue& _presentQueue, GLFWwindow* _win)
-            : graphicsQueue(_graphicsQueue), presentQueue(_presentQueue), win(_win) {};
+    static VkPhysicalDevice physicalDevice;
+    static VkDevice device;
+    static VkSurfaceKHR surface;
+
     void init();
     bool check_validation_layer_support();
     void pickPhysicalDevice();

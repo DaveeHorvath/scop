@@ -1,5 +1,9 @@
 #include "image.hpp"
 #include "renderPipeline.hpp"
+#include "Vulkan.hpp"
+
+VkDevice VulkanInstance::device;
+VkPhysicalDevice VulkanInstance::physicalDevice;
 
 void Image::makeImage(uint32_t width, uint32_t height, VkImageTiling tiling, VkImageUsageFlags usage)
 {
@@ -18,20 +22,20 @@ void Image::makeImage(uint32_t width, uint32_t height, VkImageTiling tiling, VkI
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 
-    if (vkCreateImage(device, &imageInfo, nullptr, &image) != VK_SUCCESS)
+    if (vkCreateImage(VulkanInstance::device, &imageInfo, nullptr, &image) != VK_SUCCESS)
         throw std::runtime_error("Failed to create texture image");
 
     VkMemoryRequirements memRequirements;
-    vkGetImageMemoryRequirements(device, image, &memRequirements);
+    vkGetImageMemoryRequirements(VulkanInstance::device, image, &memRequirements);
 
     VkMemoryAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, physicalDevice);
+    allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VulkanInstance::physicalDevice);
 
-    if (vkAllocateMemory(device, &allocInfo, nullptr, &imageMemory) != VK_SUCCESS)
+    if (vkAllocateMemory(VulkanInstance::device, &allocInfo, nullptr, &imageMemory) != VK_SUCCESS)
         throw std::runtime_error("Failed to allocate texture image memory");
-    vkBindImageMemory(device, image, imageMemory, 0);
+    vkBindImageMemory(VulkanInstance::device, image, imageMemory, 0);
 }
 
 void Image::makeImageView()
@@ -47,7 +51,7 @@ void Image::makeImageView()
     viewInfo.subresourceRange.baseArrayLayer = 0;
     viewInfo.subresourceRange.layerCount = 1;
 
-    if (vkCreateImageView(device, &viewInfo, nullptr, &imageView) != VK_SUCCESS)
+    if (vkCreateImageView(VulkanInstance::device, &viewInfo, nullptr, &imageView) != VK_SUCCESS)
         throw std::runtime_error("Failed to create texture image view");
 }
 
@@ -62,7 +66,7 @@ void Image::makeImageSampler()
     samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
     samplerInfo.anisotropyEnable = VK_FALSE; // should be true on an actual gpu
     VkPhysicalDeviceProperties props{};
-    vkGetPhysicalDeviceProperties(physicalDevice, &props);
+    vkGetPhysicalDeviceProperties(VulkanInstance::physicalDevice, &props);
     samplerInfo.maxAnisotropy = props.limits.maxSamplerAnisotropy;
     samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
     samplerInfo.unnormalizedCoordinates = VK_FALSE;
@@ -72,7 +76,7 @@ void Image::makeImageSampler()
     samplerInfo.mipLodBias = 0.0f;
     samplerInfo.minLod = 0.0f;
     samplerInfo.maxLod = 0.0f;
-    if (vkCreateSampler(device, &samplerInfo, nullptr, &sampler) != VK_SUCCESS)
+    if (vkCreateSampler(VulkanInstance::device, &samplerInfo, nullptr, &sampler) != VK_SUCCESS)
         throw std::runtime_error("Failed to create texture sampler");
 }
 
@@ -121,7 +125,7 @@ VkFormat Image::findSupportedFormat(const std::vector<VkFormat> &candidates, VkI
     for (auto format : candidates)
     {
         VkFormatProperties props;
-        vkGetPhysicalDeviceFormatProperties(physicalDevice, format, &props);
+        vkGetPhysicalDeviceFormatProperties(VulkanInstance::physicalDevice, format, &props);
         if (tiling == VK_IMAGE_TILING_LINEAR && (props.linearTilingFeatures & features) == features)
             return format;
         if (tiling == VK_IMAGE_TILING_OPTIMAL && (props.optimalTilingFeatures & features) == features)
