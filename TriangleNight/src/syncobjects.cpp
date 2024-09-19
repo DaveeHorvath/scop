@@ -1,8 +1,6 @@
 #include "syncobjects.hpp"
 #include "Vulkan.hpp"
 
-VkDevice VulkanInstance::device;
-
 void Syncobjects::makeSyncObjects()
 {
     imageDoneSemaphores.resize(MAX_FRAMES_IN_FLIGHT);

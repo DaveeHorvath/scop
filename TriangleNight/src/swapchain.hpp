@@ -20,12 +20,12 @@ class Swapchain {
     private:
         SwapChainSupportDetails findSwapChainSupportDetails();
     public:
-        static VkSwapchainKHR swapchain;
-        static VkExtent2D swapchainExtent;
+        inline static VkSwapchainKHR swapchain;
+        inline static VkExtent2D swapchainExtent;
         // needs refactor into Image class
-        static std::vector<VkImage> swapchainImages;
-        static std::vector<VkImageView> swapchainImagesViews;
-        static VkFormat swapchainImageFormat;
+        inline static std::vector<VkImage> swapchainImages;
+        inline static std::vector<VkImageView> swapchainImagesViews;
+        inline static VkFormat swapchainImageFormat;
         uint32_t swapchainImageCount = 0;
         void makeSwapchain();
         void remakeSwapchain();

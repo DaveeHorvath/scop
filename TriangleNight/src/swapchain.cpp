@@ -7,10 +7,6 @@ VkSurfaceFormatKHR pickSurfaceFormat(const std::vector<VkSurfaceFormatKHR> forma
 VkPresentModeKHR pickSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
 VkExtent2D pickSwapChainExtent(const VkSurfaceCapabilitiesKHR& capabilities);
 
-VkSurfaceKHR VulkanInstance::surface;
-VkDevice VulkanInstance::device;
-VkPhysicalDevice VulkanInstance::physicalDevice;
-
 void Swapchain::makeSwapchain()
 {
     SwapChainSupportDetails details = findSwapChainSupportDetails();
@@ -52,7 +48,7 @@ void Swapchain::makeSwapchain()
     swapchainImages.resize(swapchainImageCount);
     vkGetSwapchainImagesKHR(VulkanInstance::device, swapchain, &swapchainImageCount, swapchainImages.data());
     /* Make swapchain image views */
-    swapchainImagesViews.resize(swapchainImages.size());
+    // swapchainImagesViews.resize(swapchainImages.size());
     for (int i = 0; i < swapchainImages.size(); i++)
         swapchainImagesViews[i] = makeImageView(swapchainImages[i], swapchainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
 }
@@ -148,4 +144,25 @@ VkPresentModeKHR pickSwapPresentMode(const std::vector<VkPresentModeKHR>& availa
 VkExtent2D pickSwapChainExtent(const VkSurfaceCapabilitiesKHR& capabilities)
 {
     return capabilities.currentExtent;
+}
+
+VkImageView makeImageView(VkImage image, VkFormat format, VkImageAspectFlags flags)
+{
+    VkImageViewCreateInfo viewInfo{};
+    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    viewInfo.image = image;
+    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    viewInfo.format = format;
+    viewInfo.subresourceRange.aspectMask = flags;
+    viewInfo.subresourceRange.baseMipLevel = 0;
+    viewInfo.subresourceRange.levelCount = 1;
+    viewInfo.subresourceRange.baseArrayLayer = 0;
+    viewInfo.subresourceRange.layerCount = 1;
+    
+    VkImageView imageView;
+
+    if (vkCreateImageView(VulkanInstance::device, &viewInfo, nullptr, &imageView) != VK_SUCCESS)
+        throw std::runtime_error("Failed to create texture image view");
+
+    return imageView;
 }

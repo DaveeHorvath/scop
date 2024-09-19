@@ -10,11 +10,6 @@
 #include "swapchain.hpp"
 #include "image.hpp"
 
-VkDevice VulkanInstance::device;
-VkPhysicalDevice VulkanInstance::physicalDevice;
-VkExtent2D Swapchain::swapchainExtent;
-VkFormat Swapchain::swapchainImageFormat;
-
 static std::vector<char> readShader(const std::string &filename)
 {
 	std::ifstream file(filename, std::ios::ate | std::ios::binary);

@@ -5,7 +5,7 @@
 #include <GLFW/glfw3.h>
 #include <stdexcept>
 
-uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags props, VkPhysicalDevice physicalDevice);
+// static uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags props, VkPhysicalDevice physicalDevice);
 class RenderPipeline;
 
 

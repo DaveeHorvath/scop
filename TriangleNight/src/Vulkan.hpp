@@ -19,9 +19,9 @@ private:
 
     VkInstance instance;
 public:
-    static VkPhysicalDevice physicalDevice;
-    static VkDevice device;
-    static VkSurfaceKHR surface;
+    inline static VkPhysicalDevice physicalDevice;
+    inline static VkDevice device;
+    inline static VkSurfaceKHR surface;
 
     void init();
     bool check_validation_layer_support();

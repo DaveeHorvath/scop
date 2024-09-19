@@ -1,5 +1,5 @@
 #ifndef APP_HPP
-#define APP_HPP
+# define APP_HPP
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -10,7 +10,7 @@
 
 #include <stdexcept>
 
-static uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags props, VkPhysicalDevice physicalDevice)
+inline static uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags props, VkPhysicalDevice physicalDevice)
 {
     VkPhysicalDeviceMemoryProperties memProps;
     vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProps);
@@ -21,6 +21,7 @@ static uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags props,
     }
     throw std::runtime_error("Failed to find suitable memory type");
 }
+
 #include "UniformBufferObject.hpp"
 #include "window.hpp"
 #include "Vulkan.hpp"
@@ -114,7 +115,7 @@ class App {
         // needs to move somewhere, unsure atm
         void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height)
         {
-            VkCommandBuffer commandBuffer = renderpipeline.beginSingleTimeCommands();
+            VkCommandBuffer commandBuffer = RenderPipeline::beginSingleTimeCommands();
                 VkBufferImageCopy region{};
                 region.bufferOffset = 0;
                 region.bufferRowLength = 0;
@@ -132,7 +133,7 @@ class App {
                     1
                 };
                 vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-            renderpipeline.endSingleTimeCommands(commandBuffer);
+            RenderPipeline::endSingleTimeCommands(commandBuffer);
         }
         void makeIndexBuffer();
         void makeVertexBuffer();

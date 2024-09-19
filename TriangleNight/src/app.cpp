@@ -5,10 +5,6 @@
 #include <iostream>
 #include <stdexcept>
 
-VkDevice VulkanInstance::device;
-VkPhysicalDevice VulkanInstance::physicalDevice;
-VkExtent2D Swapchain::swapchainExtent;
-
 void App::updateUniformBuffer(uint32_t currentImage)
 {
     static auto startTime = std::chrono::high_resolution_clock::now();

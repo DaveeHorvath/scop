@@ -2,9 +2,7 @@
 #include <cstring>
 #include "renderPipeline.hpp"
 #include "Vulkan.hpp"
-
-VkPhysicalDevice VulkanInstance::physicalDevice;
-VkDevice VulkanInstance::device;
+#include "app.hpp"
 
 void Buffer::makeBuffer(VkDeviceSize tmpsize, VkBufferUsageFlags usage, VkMemoryPropertyFlags props, VkBuffer &tmpbuffer, VkDeviceMemory &tmpbufferMemory)
 {

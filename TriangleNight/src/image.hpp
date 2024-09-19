@@ -6,7 +6,7 @@
 #include <stdexcept>
 #include <vector>
 
-uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags props, VkPhysicalDevice physical);
+// uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags props, VkPhysicalDevice physical);
 
 class RenderPipeline;
 

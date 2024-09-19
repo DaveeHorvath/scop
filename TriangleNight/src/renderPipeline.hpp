@@ -23,16 +23,16 @@ public:
     VkDescriptorSetLayout descriptorSetLayout;
     VkPipelineLayout pipelineLayout;
 
-    static VkQueue graphicsQueue;
-    static VkQueue presentQueue;
+    inline static VkQueue graphicsQueue;
+    inline static VkQueue presentQueue;
 
-    static VkPipeline graphicsPipeline;
+    inline static VkPipeline graphicsPipeline;
     std::vector<VkFramebuffer> swapchainFramebuffers;
 
-    static VkCommandPool commandPool;
+    inline static VkCommandPool commandPool;
     std::vector<VkCommandBuffer> commandBuffers;
 
-    static VkDescriptorPool descriptorPool;
+    inline static VkDescriptorPool descriptorPool;
     std::vector<VkDescriptorSet> descriptorSets;
 
     static VkCommandBuffer beginSingleTimeCommands();

@@ -6,9 +6,6 @@
 #include "renderPipeline.hpp"
 #include "window.hpp"
 
-VkQueue RenderPipeline::graphicsQueue;
-VkQueue RenderPipeline::presentQueue;
-
 bool VulkanInstance::check_validation_layer_support()
 {
     uint32_t layerCount = 0;

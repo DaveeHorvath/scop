@@ -1,9 +1,7 @@
 #include "image.hpp"
 #include "renderPipeline.hpp"
 #include "Vulkan.hpp"
-
-VkDevice VulkanInstance::device;
-VkPhysicalDevice VulkanInstance::physicalDevice;
+#include "app.hpp"
 
 void Image::makeImage(uint32_t width, uint32_t height, VkImageTiling tiling, VkImageUsageFlags usage)
 {
