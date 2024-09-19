@@ -66,8 +66,6 @@ void Swapchain::remakeSwapchain()
     vkDeviceWaitIdle(VulkanInstance::device);
     cleanupSwapChain();
     makeSwapchain();
-    // makeDepthResources();
-    // makeFrameBuffer();
 }
 
 // void Swapchain::makeFrameBuffer()

@@ -29,6 +29,8 @@ void App::drawFrame()
     if (res == VK_ERROR_OUT_OF_DATE_KHR)
     {
         swapchain.remakeSwapchain();
+        makeDepthResources();
+        renderpipeline.makeFrameBuffer(depth);
         return;
     }
     else if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
@@ -70,6 +72,8 @@ void App::drawFrame()
     {
         frameResize = false;
         swapchain.remakeSwapchain();
+        makeDepthResources();
+        renderpipeline.makeFrameBuffer(depth);
         return;
     }
     else if (res != VK_SUCCESS)
