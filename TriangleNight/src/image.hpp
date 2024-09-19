@@ -18,7 +18,7 @@ public:
     VkDeviceMemory imageMemory;
     VkImageView imageView;
     VkSampler sampler;
-    void makeImageView();
+    void makeImageView(VkImageAspectFlags aspectFlags);
     void makeImage(uint32_t width, uint32_t height, VkImageTiling tiling, VkImageUsageFlags usage);
     void makeImageSampler();
     void transitionImageLayout(RenderPipeline& renderpipeline, VkImageLayout oldLayout, VkImageLayout newLayout);

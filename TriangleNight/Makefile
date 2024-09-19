@@ -25,6 +25,9 @@ $(NAME): $(OBJ_DIR) $(OBJ) $(SPV)
 $(OBJ_DIR):
 	mkdir -p $(OBJ_DIR)
 
+$(OBJ_DIR)%.o: $(SRC_DIR)%.cpp $(SRC_DIR)%.hpp
+	$(CXX) $(CXXFLAGS) -c -o $(NAME) $< -o $@ 
+
 $(OBJ_DIR)%.o: $(SRC_DIR)%.cpp
 	$(CXX) $(CXXFLAGS) -c -o $(NAME) $< -o $@ 
 

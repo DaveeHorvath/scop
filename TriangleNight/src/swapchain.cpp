@@ -2,6 +2,7 @@
 #include "QueueFamilyIndicies.hpp"
 #include "Vulkan.hpp"
 #include "window.hpp"
+#include <iostream>
 
 VkSurfaceFormatKHR pickSurfaceFormat(const std::vector<VkSurfaceFormatKHR> formats);
 VkPresentModeKHR pickSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
@@ -9,6 +10,7 @@ VkExtent2D pickSwapChainExtent(const VkSurfaceCapabilitiesKHR& capabilities);
 
 void Swapchain::makeSwapchain()
 {
+    std::cout << "<= create swapchain =>\n";
     SwapChainSupportDetails details = findSwapChainSupportDetails();
     uint32_t imageCount = details.capabilities.minImageCount + 1;
     if (details.capabilities.maxImageCount > 0 && imageCount > details.capabilities.maxImageCount)
@@ -48,7 +50,7 @@ void Swapchain::makeSwapchain()
     swapchainImages.resize(swapchainImageCount);
     vkGetSwapchainImagesKHR(VulkanInstance::device, swapchain, &swapchainImageCount, swapchainImages.data());
     /* Make swapchain image views */
-    // swapchainImagesViews.resize(swapchainImages.size());
+    swapchainImagesViews.resize(swapchainImages.size());
     for (int i = 0; i < swapchainImages.size(); i++)
         swapchainImagesViews[i] = makeImageView(swapchainImages[i], swapchainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
 }

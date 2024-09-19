@@ -74,14 +74,15 @@ void VulkanInstance::init()
     {
         std::vector<VkExtensionProperties> extensions(extensionCount);
         vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
-        std::cout << "Availiable Extensions: \n";
-        for (auto &ext : extensions)
-            std::cout << "\t" << ext.extensionName << "\n";
+        // std::cout << "Availiable Extensions: \n";
+        // for (auto &ext : extensions)
+        //     std::cout << "\t" << ext.extensionName << "\n";
     }
 }
 
 void VulkanInstance::pickPhysicalDevice()
 {
+    std::cout << "<= pick physical device =>\n";
     uint32_t deviceCount = 0;
     vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
     if (deviceCount == 0)
@@ -94,7 +95,8 @@ void VulkanInstance::pickPhysicalDevice()
 
 void VulkanInstance::makeLogicalDevice()
 {
-    QueueFamilyIndicies queues = QueueFamilyIndicies::findQueueFamilyIndicies(physicalDevice, VK_NULL_HANDLE);
+    std::cout << "<= create logical device =>\n";
+    QueueFamilyIndicies queues = QueueFamilyIndicies::findQueueFamilyIndicies(physicalDevice, surface);
     std::set<uint32_t> uniquequeues{queues.graphicsFamily.value(), queues.presentFamily.value()};
 
     float queuePrio = 1.0f;
@@ -139,6 +141,7 @@ void VulkanInstance::makeLogicalDevice()
 
 void VulkanInstance::createSurface()
 {
+    std::cout << "<= create surface =>\n";
     if (glfwCreateWindowSurface(instance, Window::win, nullptr, &surface) != VK_SUCCESS)
         throw std::runtime_error("Failed to create surface");
 }

@@ -2,6 +2,7 @@
 #include <string>
 #include <fstream>
 #include <array>
+#include <iostream>
 #include "QueueFamilyIndicies.hpp"
 #include "UniformBufferObject.hpp"
 #include "Model.hpp"
@@ -232,6 +233,7 @@ void RenderPipeline::makeDescriptorPool()
 
 void RenderPipeline::makeRenderPass(Image depthImage)
 {
+	std::cout << "<= create render pass =>\n";
 	VkAttachmentDescription attachmentDescription{};
 	attachmentDescription.format = Swapchain::swapchainImageFormat;
 	attachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;

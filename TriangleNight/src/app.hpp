@@ -9,6 +9,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <stdexcept>
+#include <iostream>
 
 inline static uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags props, VkPhysicalDevice physicalDevice)
 {
@@ -145,6 +146,8 @@ class App {
         void init()
         {
             window.init();
+            std::cout << "instance creation\n";
+            instance.init();
             // init_window();
 
             /* Surface*/
@@ -154,24 +157,32 @@ class App {
             instance.pickPhysicalDevice();
             instance.makeLogicalDevice();
 
+            std::cout << "swapchain creation\n";
             /* SwapChain */
             swapchain.makeSwapchain();
 
             /* pipeline */
+            std::cout << "renderpipeline creation\n";
             renderpipeline.makeRenderPass(depth);
             renderpipeline.makeDescriptorSetLayout();
             renderpipeline.makePipeline();
             renderpipeline.makeCommandPool();
+            std::cout << "depth resource\n";
             makeDepthResources();
+            std::cout << "frame buffer\n";
             renderpipeline.makeFrameBuffer(depth);
+            std::cout << "texture image\n";
             makeTextureImage();
-            // makeTextureImageView();
-            // makeTextureSampler();
+            texture.makeImageView(VK_IMAGE_ASPECT_COLOR_BIT);
+            texture.makeImageSampler();
+            std::cout << "cmdbuffer\n";
             renderpipeline.makeCommandBuffer();
 
             /* Vertex Buffer */
+            std::cout << "model creation\n";
             model.loadModel();
 
+            std::cout << "buffer creation\n";
             makeVertexBuffer();
             makeIndexBuffer();
             makeUniformBuffers();
@@ -179,6 +190,7 @@ class App {
             renderpipeline.makeDescriptorSets(uniformBuffers, texture);
 
             /* Sync */
+            std::cout << "sync creation\n";
             syncobjects.makeSyncObjects();
         }
         void loop();
