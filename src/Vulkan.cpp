@@ -5,6 +5,7 @@
 #include "QueueFamilyIndicies.hpp"
 #include "renderPipeline.hpp"
 #include "window.hpp"
+#include "Logger.hpp"
 
 bool VulkanInstance::check_validation_layer_support()
 {
@@ -31,7 +32,7 @@ bool VulkanInstance::check_validation_layer_support()
 
 void VulkanInstance::init()
 {
-    std::cout << "=====  Vulkan init  =====\n";
+    std::cout << Logger::debug << "Vulkan engine: made by @dhorvath" << Logger::reset;
     /* Validation layer */
     if (enableValidationLayers && !check_validation_layer_support())
         throw std::runtime_error("Failed to init validation layers");
@@ -39,7 +40,7 @@ void VulkanInstance::init()
     VkApplicationInfo appInfo{};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.apiVersion = VK_API_VERSION_1_0;
-    appInfo.pApplicationName = "Tardation";
+    appInfo.pApplicationName = "Scop";
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 1, 0);
     appInfo.pEngineName = "No Engine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 1, 0);
@@ -82,7 +83,6 @@ void VulkanInstance::init()
 
 void VulkanInstance::pickPhysicalDevice()
 {
-    std::cout << "<= pick physical device =>\n";
     uint32_t deviceCount = 0;
     vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
     if (deviceCount == 0)
@@ -95,7 +95,6 @@ void VulkanInstance::pickPhysicalDevice()
 
 void VulkanInstance::makeLogicalDevice()
 {
-    std::cout << "<= create logical device =>\n";
     QueueFamilyIndicies queues = QueueFamilyIndicies::findQueueFamilyIndicies(physicalDevice, surface);
     std::set<uint32_t> uniquequeues{queues.graphicsFamily.value(), queues.presentFamily.value()};
 
@@ -141,7 +140,6 @@ void VulkanInstance::makeLogicalDevice()
 
 void VulkanInstance::createSurface()
 {
-    std::cout << "<= create surface =>\n";
     if (glfwCreateWindowSurface(instance, Window::win, nullptr, &surface) != VK_SUCCESS)
         throw std::runtime_error("Failed to create surface");
 }

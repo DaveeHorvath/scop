@@ -7,6 +7,7 @@ int main()
 
     try
     {
+        std::cout << "\033[2J";
         app.run();
     }
     catch(const std::exception& e)

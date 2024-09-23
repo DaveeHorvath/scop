@@ -3,7 +3,6 @@
 #include "app.hpp"
 void Window::init()
 {
-    std::cout << "=====  Window init  =====\n";
     glfwInit();
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);

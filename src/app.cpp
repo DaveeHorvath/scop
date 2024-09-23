@@ -4,6 +4,7 @@
 #include <stb_image.h>
 #include <iostream>
 #include <stdexcept>
+#include "Logger.hpp"
 
 void App::updateUniformBuffer(uint32_t currentImage)
 {
@@ -184,20 +185,20 @@ void App::makeDepthResources()
 
 void App::loop()
 {
-    std::cout << "=====  LOOP'O CLOCK  =====\n";
+    std::cout << Logger::info << "Main loop" << Logger::reset;
     while (!glfwWindowShouldClose(Window::win))
     {
         glfwPollEvents();
         drawFrame();
     }
-    std::cout << "=====  WAIT FOR CLEAN  =====\n";
+    std::cout << Logger::info << "Terminating" << Logger::reset;
     vkDeviceWaitIdle(VulkanInstance::device);
 }
 
 // needs refactor
 void App::clean()
 {
-    std::cout << "=====  CLEANUP  =====\n";
+    std::cout << Logger::info << "Cleanup" << Logger::reset;
 
     // for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
     // {
@@ -279,10 +280,9 @@ void App::run()
 
 void App::init()
 {
+    std::cout << Logger::info << "Engine started" << Logger::reset;
     window.init();
-    std::cout << "instance creation\n";
     instance.init();
-    // init_window();
 
     /* Surface*/
     instance.createSurface();
@@ -291,32 +291,28 @@ void App::init()
     instance.pickPhysicalDevice();
     instance.makeLogicalDevice();
 
-    std::cout << "swapchain creation\n";
+    std::cout << Logger::info << "Swapchain created" << Logger::reset;
     /* SwapChain */
     swapchain.makeSwapchain();
 
     /* pipeline */
-    std::cout << "renderpipeline creation\n";
+    std::cout << Logger::info << "Renderpipeline" << Logger::reset;
     renderpipeline.makeRenderPass(depth);
     renderpipeline.makeDescriptorSetLayout();
     renderpipeline.makePipeline();
     renderpipeline.makeCommandPool();
-    std::cout << "depth resource\n";
     makeDepthResources();
-    std::cout << "frame buffer\n";
     renderpipeline.makeFrameBuffer(depth);
-    std::cout << "texture image\n";
     makeTextureImage();
     texture.makeImageView(VK_IMAGE_ASPECT_COLOR_BIT);
     texture.makeImageSampler();
-    std::cout << "cmdbuffer\n";
     renderpipeline.makeCommandBuffer();
 
     /* Vertex Buffer */
-    std::cout << "model creation\n";
+    std::cout << Logger::info << "Model creation" << Logger::reset;
     model.loadModel();
 
-    std::cout << "buffer creation\n";
+    std::cout << Logger::info << "Buffer initialization" << Logger::reset;
     makeVertexBuffer();
     makeIndexBuffer();
     makeUniformBuffers();
@@ -324,6 +320,5 @@ void App::init()
     renderpipeline.makeDescriptorSets(uniformBuffers, texture);
 
     /* Sync */
-    std::cout << "sync creation\n";
     syncobjects.makeSyncObjects();
 }

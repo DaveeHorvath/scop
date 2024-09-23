@@ -10,7 +10,6 @@ VkExtent2D pickSwapChainExtent(const VkSurfaceCapabilitiesKHR& capabilities);
 
 void Swapchain::makeSwapchain()
 {
-    std::cout << "<= create swapchain =>\n";
     SwapChainSupportDetails details = findSwapChainSupportDetails();
     uint32_t imageCount = details.capabilities.minImageCount + 1;
     if (details.capabilities.maxImageCount > 0 && imageCount > details.capabilities.maxImageCount)

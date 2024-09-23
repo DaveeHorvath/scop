@@ -1,7 +1,5 @@
 .vscode
 .vscode/*
 obj/
-triangle/
-Logger/logger
-Logger/obj/
+triangle
 shaders/*.spv

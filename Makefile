@@ -1,6 +1,6 @@
 NAME=triangle
 CXX=c++
-LIBS=/home/kali/.libs
+LIBS=/home/dhorvath/.libs
 CXXFLAGS= -std=c++17 -Ofast -DDEBUG -g -I$(LIBS)/stb
 LDFLAGS = -lglfw -lvulkan -ldl -lpthread -lX11 -lXxf86vm -lXrandr -lXi
 
@@ -13,14 +13,14 @@ SHADER_DIR = shaders/
 SHADERS=$(addprefix $(SHADER_DIR), shader.frag shader.vert)
 SPV=$(addprefix $(SHADER_DIR), frag.spv vert.spv)
 
-test: $(NAME)
-	./triangle
+$(NAME): $(OBJ_DIR) $(OBJ) $(SPV)
+	$(CXX) $(CXXFLAGS) -o $(NAME) $(OBJ) $(LDFLAGS)
+
+run: $(NAME)
+	@./triangle
 
 $(SHADER_DIR)%.spv: $(SHADER_DIR)shader.%
 	glslc $< -o $@
-
-$(NAME): $(OBJ_DIR) $(OBJ) $(SPV)
-	$(CXX) $(CXXFLAGS) -o $(NAME) $(OBJ) $(LDFLAGS)
 
 $(OBJ_DIR):
 	mkdir -p $(OBJ_DIR)
