@@ -1,0 +1,7 @@
+.vscode
+.vscode/*
+obj/
+triangle/
+Logger/logger
+Logger/obj/
+shaders/*.spv
