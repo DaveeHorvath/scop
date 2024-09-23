@@ -20,6 +20,7 @@ void Model::loadModel()
         {
             Vertex v;
             ss >> v.pos.x >> v.pos.y >> v.pos.z;
+            v.texCoord = {v.pos.x / glm::length(v.pos), -v.pos.y / glm::length(v.pos)};
             read_verticies.push_back(v);
         }
         else if (type == 'f')
@@ -33,9 +34,9 @@ void Model::loadModel()
             }
             for (int i = 0; i + 2 < face.size(); i++)
             {
+                read_indicies.push_back(face[i + 2]);
                 read_indicies.push_back(face[i]);
                 read_indicies.push_back(face[i + 1]);
-                read_indicies.push_back(face[i + 2]);
             }
         }
     }
