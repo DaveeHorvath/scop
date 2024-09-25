@@ -4,6 +4,8 @@
 #include <string>
 #include <sstream>
 
+#include <iostream>
+
 void Model::loadModel()
 {
     std::vector<Vertex> read_verticies;
@@ -32,6 +34,8 @@ void Model::loadModel()
                 if (item != "")
                     face.push_back(std::stoi(item));
             }
+            if (face.size() != 3)
+                std::cout << "weird shit detected\n";
             for (int i = 0; i + 2 < face.size(); i++)
             {
                 read_indicies.push_back(face[i + 2]);

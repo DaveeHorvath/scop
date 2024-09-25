@@ -37,8 +37,8 @@ inline static uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags
 
 
 class App {
-    uint32_t currentFrame;
     public:
+        uint32_t currentFrame = 0;
         Window window;
         bool frameResize = false;
 

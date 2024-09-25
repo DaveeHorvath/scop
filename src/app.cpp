@@ -23,9 +23,9 @@ void App::updateUniformBuffer(uint32_t currentImage)
 
 void App::drawFrame()
 {
-    vkWaitForFences(VulkanInstance::device, 1, &syncobjects.inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
-    uint32_t image;
-    VkResult res = vkAcquireNextImageKHR(VulkanInstance::device, Swapchain::swapchain, UINT64_MAX, syncobjects.imageDoneSemaphores[currentFrame], VK_NULL_HANDLE, &image);
+    vkWaitForFences(VulkanInstance::device, 1, &Syncobjects::inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
+    uint32_t image = 0;
+    VkResult res = vkAcquireNextImageKHR(VulkanInstance::device, Swapchain::swapchain, UINT64_MAX, Syncobjects::imageDoneSemaphores[currentFrame], VK_NULL_HANDLE, &image);
 
     if (res == VK_ERROR_OUT_OF_DATE_KHR)
     {
@@ -39,7 +39,7 @@ void App::drawFrame()
 
     updateUniformBuffer(currentFrame);
 
-    vkResetFences(VulkanInstance::device, 1, &syncobjects.inFlightFences[currentFrame]);
+    vkResetFences(VulkanInstance::device, 1, &Syncobjects::inFlightFences[currentFrame]);
 
     vkResetCommandBuffer(renderpipeline.commandBuffers[currentFrame], 0);
     renderpipeline.recordCommandBuffer(renderpipeline.commandBuffers[currentFrame], image, currentFrame, vertexBuffer, indexBuffer, model);
